@@ -10,9 +10,9 @@ import org.springframework.web.bind.annotation.RestControllerAdvice
 @RestControllerAdvice
 class ApiExceptionHandler {
 
-    @ExceptionHandler(S3ViewerException::class)
-    fun handleS3ViewerException(exception: S3ViewerException): ResponseEntity<ErrorResponse> =
-        ResponseEntity
-            .status(HttpStatus.NOT_FOUND)
-            .body(ErrorResponse().message(exception.message ?: "Unknown S3 viewer error"))
+//    @ExceptionHandler(S3ViewerException::class)
+//    fun handleS3ViewerException(exception: S3ViewerException): ResponseEntity<ErrorResponse> =
+//        ResponseEntity
+//            .status(HttpStatus.NOT_FOUND)
+//            .body(ErrorResponse().message(exception.message ?: "Unknown S3 viewer error"))
 }

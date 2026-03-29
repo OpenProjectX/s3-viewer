@@ -14,3 +14,7 @@ s3-viewer:
       buckets:
         - demo-assets
         - demo-archive
+logging:
+  level:
+    "software.amazon": "TRACE"
+    "org.apache.hc.client5": "TRACE"

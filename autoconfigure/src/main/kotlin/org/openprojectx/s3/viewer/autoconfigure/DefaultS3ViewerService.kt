@@ -9,12 +9,11 @@ import org.openprojectx.s3.viewer.core.S3ViewerService
 import org.openprojectx.s3.viewer.core.SearchResult
 import org.openprojectx.s3.viewer.core.ViewerBucket
 import org.openprojectx.s3.viewer.core.ViewerProvider
-import software.amazon.nio.spi.s3.S3FileSystemProvider
+import software.amazon.nio.spi.s3.SpringAwareS3FileSystemProvider
 import java.io.InputStream
 import java.net.URI
 import java.net.URLConnection
 import java.nio.file.FileSystem
-import java.nio.file.FileSystemAlreadyExistsException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
@@ -28,7 +27,7 @@ internal class DefaultS3ViewerService(
     private val properties: S3ViewerProperties
 ) : S3ViewerService {
 
-    private val fileSystemProvider = S3FileSystemProvider()
+    private val fileSystemProviders = ConcurrentHashMap<String, SpringAwareS3FileSystemProvider>()
     private val fileSystems = ConcurrentHashMap<String, FileSystem>()
 
     override fun listProviders(): List<ViewerProvider> = properties.providers.map { provider ->
@@ -114,7 +113,6 @@ internal class DefaultS3ViewerService(
         val fileSystem = fileSystem(provider, bucketName)
         val targetPath = fileSystem.getPath("/${key.trimStart('/')}").normalize()
 
-        // Ensure parent directories exist (S3 is flat, but the NIO provider may need it)
         val parentDir = targetPath.parent
         if (parentDir != null && !Files.exists(parentDir)) {
             Files.createDirectories(parentDir)
@@ -224,9 +222,7 @@ internal class DefaultS3ViewerService(
         return fileSystems.computeIfAbsent(key) {
             val bucketUri = URI.create("s3://$bucketName")
             try {
-                fileSystemProvider.newFileSystem(bucketUri, createEnvironment(provider))
-            } catch (_: FileSystemAlreadyExistsException) {
-                fileSystemProvider.getFileSystem(bucketUri)
+                providerInstance(provider).getFileSystem(bucketUri)
             } catch (ex: Exception) {
                 throw S3ViewerException(
                     "Failed to create an S3 file system for provider '${provider.id}' and bucket '$bucketName'",
@@ -236,14 +232,10 @@ internal class DefaultS3ViewerService(
         }
     }
 
-    private fun createEnvironment(provider: S3ViewerProperties.Provider): Map<String, *> =
-        linkedMapOf<String, Any>(
-            "region" to provider.region,
-            "endpoint" to provider.endpoint,
-            "accessKey" to provider.accessKey,
-            "secretAccessKey" to provider.secretKey,
-            "pathStyleAccess" to provider.pathStyleAccess
-        )
+    private fun providerInstance(provider: S3ViewerProperties.Provider): SpringAwareS3FileSystemProvider =
+        fileSystemProviders.computeIfAbsent(provider.id) {
+            SpringAwareS3FileSystemProvider(provider)
+        }
 
     private fun toEntry(baseDirectory: Path, entry: Path): BucketObjectEntry {
         val attributes = Files.readAttributes(entry, BasicFileAttributes::class.java)

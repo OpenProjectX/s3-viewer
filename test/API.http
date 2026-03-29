@@ -1,0 +1,32 @@
+###
+GET {{baseUrl}}/api/v1/providers
+
+###
+GET {{baseUrl}}/api/v1/providers/{{providerId}}/buckets
+
+###
+GET {{baseUrl}}/api/v1/providers/{{providerId}}/buckets/{{bucketName}}/browse?
+    path={{$random.alphanumeric(8)}}
+
+###
+GET {{baseUrl}}/api/v1/providers/{{providerId}}/buckets/{{bucketName}}/download?
+    key={{$random.alphanumeric(8)}}
+
+###
+POST {{baseUrl}}/api/v1/providers/{{providerId}}/buckets/{{bucketName}}/upload?
+    path={{$random.alphanumeric(8)}}
+    Content-Type: multipart/form-data
+
+###
+DELETE {{baseUrl}}/api/v1/providers/{{providerId}}/buckets/{{bucketName}}/objects
+Content-Type: application/json
+
+{
+  "keys": []
+}
+
+###
+GET {{baseUrl}}/api/v1/providers/{{providerId}}/buckets/{{bucketName}}/search?
+    query={{$random.alphanumeric(8)}}&
+    path={{$random.alphanumeric(8)}}&
+    maxResults={{$random.integer(100)}}
