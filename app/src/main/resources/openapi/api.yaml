@@ -63,6 +63,121 @@ paths:
                 $ref: "#/components/schemas/BrowseResponse"
         "404":
           $ref: "#/components/responses/NotFound"
+  /api/v1/providers/{providerId}/buckets/{bucketName}/download:
+    get:
+      tags: [Viewer]
+      operationId: downloadObject
+      summary: Download an object from a bucket
+      parameters:
+        - $ref: "#/components/parameters/ProviderId"
+        - $ref: "#/components/parameters/BucketName"
+        - name: key
+          in: query
+          required: true
+          description: Object key to download
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Object content streamed successfully
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /api/v1/providers/{providerId}/buckets/{bucketName}/upload:
+    post:
+      tags: [Viewer]
+      operationId: uploadObject
+      summary: Upload an object to a bucket path
+      parameters:
+        - $ref: "#/components/parameters/ProviderId"
+        - $ref: "#/components/parameters/BucketName"
+        - name: path
+          in: query
+          required: false
+          description: Target directory path (prefix) in the bucket
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: File to upload
+      responses:
+        "201":
+          description: Object uploaded successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ObjectEntry"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /api/v1/providers/{providerId}/buckets/{bucketName}/objects:
+    delete:
+      tags: [Viewer]
+      operationId: deleteObjects
+      summary: Delete one or more objects from a bucket
+      parameters:
+        - $ref: "#/components/parameters/ProviderId"
+        - $ref: "#/components/parameters/BucketName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeleteRequest"
+      responses:
+        "204":
+          description: Objects deleted successfully
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /api/v1/providers/{providerId}/buckets/{bucketName}/search:
+    get:
+      tags: [Viewer]
+      operationId: searchObjects
+      summary: Search objects in a bucket by name
+      parameters:
+        - $ref: "#/components/parameters/ProviderId"
+        - $ref: "#/components/parameters/BucketName"
+        - name: query
+          in: query
+          required: true
+          description: Search term matched against object names (case-insensitive)
+          schema:
+            type: string
+        - name: path
+          in: query
+          required: false
+          description: Restrict search to a specific prefix/directory
+          schema:
+            type: string
+        - name: maxResults
+          in: query
+          required: false
+          description: Maximum number of results to return (default 100)
+          schema:
+            type: integer
+            format: int32
+            default: 100
+      responses:
+        "200":
+          description: Search results returned successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
 components:
   parameters:
     ProviderId:
@@ -132,6 +247,20 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ObjectEntry"
+    SearchResponse:
+      type: object
+      required: [providerId, bucketName, query, entries]
+      properties:
+        providerId:
+          type: string
+        bucketName:
+          type: string
+        query:
+          type: string
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/ObjectEntry"
     ObjectEntry:
       type: object
       required: [name, key, type]
@@ -153,6 +282,15 @@ components:
     ObjectEntryType:
       type: string
       enum: [DIRECTORY, FILE]
+    DeleteRequest:
+      type: object
+      required: [keys]
+      properties:
+        keys:
+          type: array
+          items:
+            type: string
+          description: List of object keys to delete
     ErrorResponse:
       type: object
       required: [message]

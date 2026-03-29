@@ -4,7 +4,17 @@ plugins {
     id("buildsrc.convention.kotlin-jvm")
     id("buildsrc.convention.spring-kotlin")
     id("org.openapi.generator") version "7.20.0"
+}
 
+val copyUiDist = tasks.register<Copy>("copyUiDist") {
+    val uiProject = project(":ui")
+    dependsOn(uiProject.tasks.named("yarnBuild"))
+    from(uiProject.layout.projectDirectory.dir("dist"))
+    into(layout.buildDirectory.dir("resources/main/static"))
+}
+
+tasks.named("processResources") {
+    dependsOn(copyUiDist)
 }
 
 

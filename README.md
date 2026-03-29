@@ -2,27 +2,111 @@
 
 Multi-cloud S3 browser built with Spring Boot WebFlux, Kotlin, OpenAPI-generated controllers, and a React + MUI frontend.
 
-## Backend
+## Modules
 
-- `app`: Spring Boot application and OpenAPI contract
-- `autoconfigure`: configuration properties and default `S3ViewerService`
-- `core`: shared domain/service contracts
-- `starter`: starter module for the application
+| Module | Purpose |
+|---|---|
+| `app` | Spring Boot application, OpenAPI contract, REST controllers |
+| `autoconfigure` | Configuration properties and `DefaultS3ViewerService` |
+| `core` | Shared domain interfaces and types |
+| `starter` | Spring Boot starter for embedding the service |
+| `ui` | Vite + React + TypeScript + MUI frontend |
 
-The backend exposes:
+## REST API
 
-- `GET /api/v1/providers`
-- `GET /api/v1/providers/{providerId}/buckets`
-- `GET /api/v1/providers/{providerId}/buckets/{bucketName}/browse?path=...`
+All endpoints are under `/api/v1`. The OpenAPI spec is at `app/src/main/resources/openapi/api.yaml` and controllers are generated via the OpenAPI Generator Gradle plugin — **do not edit generated sources directly**.
 
-Provider configuration lives under `s3-viewer.providers` in [application.yaml](/data/Git/s3-viewer/app/src/main/resources/application.yaml).
+### Endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/providers` | List configured S3 providers |
+| `GET` | `/providers/{id}/buckets` | List buckets for a provider |
+| `GET` | `/providers/{id}/buckets/{name}/browse` | Browse objects at a path (`?path=prefix`) |
+| `GET` | `/providers/{id}/buckets/{name}/download` | Download an object (`?key=object/key`) |
+| `POST` | `/providers/{id}/buckets/{name}/upload` | Upload a file (`multipart/form-data`, `?path=prefix`) |
+| `DELETE` | `/providers/{id}/buckets/{name}/objects` | Delete objects (JSON body: `{"keys": [...]}`) |
+| `GET` | `/providers/{id}/buckets/{name}/search` | Search objects by name (`?query=term&path=prefix&maxResults=100`) |
+
+### Breaking changes from 0.1.x
+
+- `S3ViewerService` interface has **four new methods**: `downloadObject`, `uploadObject`, `deleteObjects`, `searchObjects`. Any custom implementation must implement these.
+- `ObjectDownload` and `SearchResult` are new domain types added to the `core` module.
+
+## Configuration
+
+Provider configuration lives under `s3-viewer.providers` in `application.yaml`:
+
+```yaml
+s3-viewer:
+  providers:
+    - id: my-provider
+      name: My S3
+      endpoint: https://s3.amazonaws.com
+      region: us-east-1
+      access-key: AKIAIOSFODNN7EXAMPLE
+      secret-key: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+      path-style-access: false
+      buckets:
+        - my-bucket
+        - another-bucket
+```
+
+For LocalStack (dev profile):
+
+```yaml
+s3-viewer:
+  providers:
+    - id: localstack
+      name: LocalStack
+      endpoint: http://localhost:4566
+      region: us-east-1
+      access-key: test
+      secret-key: test
+      path-style-access: true
+      buckets:
+        - demo-assets
+```
 
 ## UI
 
-`ui` is a Vite + React + MUI app with a three-panel file-browser layout for providers, buckets, and object listings.
+The `ui` module is a React + Vite + MUI single-page application. Features:
 
-Useful tasks:
+- Sidebar with provider/bucket navigation tree
+- File browser with **list** and **grid** view modes
+- Breadcrumb path navigation
+- File-type icons (images, video, audio, code, archives, data files, etc.)
+- **Search** — live case-insensitive name search within a bucket/path
+- **Upload** — drag & drop or file picker with per-file progress bars
+- **Download** — direct download button per file
+- **Delete** — multi-select with confirmation dialog
 
-- `./gradlew :app:bootRun`
-- `./gradlew :ui:yarnDev`
-- `./gradlew :ui:yarnBuild`
+In dev mode the Vite server proxies `/api` requests to the Spring app on port `8081`.
+
+## Building & running
+
+```bash
+# Run the Spring backend (dev profile includes LocalStack config)
+./gradlew :app:bootRun -Dspring.profiles.active=dev
+
+# Run the UI dev server (hot reload, proxies /api → :8081)
+./gradlew :ui:yarnDev
+
+# Build the UI only
+./gradlew :ui:yarnBuild
+
+# Build a self-contained JAR (bundles compiled UI into classpath:/static/)
+./gradlew :app:bootJar
+```
+
+The `bootJar` task automatically runs `yarnBuild` and copies `ui/dist/` into the JAR's `static/` resources, so the Spring app serves the frontend at `/`.
+
+## Regenerating the API
+
+After editing `api.yaml`, regenerate the Spring interfaces and models:
+
+```bash
+./gradlew :app:openApiGenerate
+```
+
+The generated code lands in `app/build/generate-resources/main/src/main/java/`.

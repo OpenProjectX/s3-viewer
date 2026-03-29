@@ -1,5 +1,6 @@
 package org.openprojectx.s3.viewer.core
 
+import java.io.InputStream
 import java.time.Instant
 
 interface S3ViewerService {
@@ -8,6 +9,14 @@ interface S3ViewerService {
     fun listBuckets(providerId: String): List<ViewerBucket>
 
     fun browseBucket(providerId: String, bucketName: String, path: String?): BucketBrowseResult
+
+    fun downloadObject(providerId: String, bucketName: String, key: String): ObjectDownload
+
+    fun uploadObject(providerId: String, bucketName: String, path: String?, fileName: String, inputStream: InputStream): BucketObjectEntry
+
+    fun deleteObjects(providerId: String, bucketName: String, keys: List<String>)
+
+    fun searchObjects(providerId: String, bucketName: String, query: String, path: String?, maxResults: Int): SearchResult
 }
 
 data class ViewerProvider(
@@ -46,3 +55,17 @@ enum class BucketObjectType {
     DIRECTORY,
     FILE
 }
+
+data class ObjectDownload(
+    val fileName: String,
+    val contentType: String,
+    val size: Long?,
+    val inputStream: InputStream
+)
+
+data class SearchResult(
+    val providerId: String,
+    val bucketName: String,
+    val query: String,
+    val entries: List<BucketObjectEntry>
+)

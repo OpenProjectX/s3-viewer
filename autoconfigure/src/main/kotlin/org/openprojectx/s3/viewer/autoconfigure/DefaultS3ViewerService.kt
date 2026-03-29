@@ -3,16 +3,21 @@ package org.openprojectx.s3.viewer.autoconfigure
 import org.openprojectx.s3.viewer.core.BucketBrowseResult
 import org.openprojectx.s3.viewer.core.BucketObjectEntry
 import org.openprojectx.s3.viewer.core.BucketObjectType
+import org.openprojectx.s3.viewer.core.ObjectDownload
 import org.openprojectx.s3.viewer.core.S3ViewerException
 import org.openprojectx.s3.viewer.core.S3ViewerService
+import org.openprojectx.s3.viewer.core.SearchResult
 import org.openprojectx.s3.viewer.core.ViewerBucket
 import org.openprojectx.s3.viewer.core.ViewerProvider
 import software.amazon.nio.spi.s3.S3FileSystemProvider
+import java.io.InputStream
 import java.net.URI
+import java.net.URLConnection
 import java.nio.file.FileSystem
 import java.nio.file.FileSystemAlreadyExistsException
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.StandardCopyOption
 import java.nio.file.attribute.BasicFileAttributes
 import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
@@ -68,6 +73,126 @@ internal class DefaultS3ViewerService(
             parentPath = parentPath(normalizedPath),
             entries = entries
         )
+    }
+
+    override fun downloadObject(providerId: String, bucketName: String, key: String): ObjectDownload {
+        val provider = getProvider(providerId)
+        requireAllowedBucket(provider, bucketName)
+
+        val fileSystem = fileSystem(provider, bucketName)
+        val path = fileSystem.getPath("/${key.trimStart('/')}").normalize()
+
+        if (!Files.exists(path) || Files.isDirectory(path)) {
+            throw S3ViewerException("Object '$key' was not found in bucket '$bucketName'")
+        }
+
+        val attributes = Files.readAttributes(path, BasicFileAttributes::class.java)
+        val fileName = path.name.ifBlank { key }
+        val contentType = URLConnection.guessContentTypeFromName(fileName) ?: "application/octet-stream"
+
+        return ObjectDownload(
+            fileName = fileName,
+            contentType = contentType,
+            size = attributes.size(),
+            inputStream = Files.newInputStream(path)
+        )
+    }
+
+    override fun uploadObject(
+        providerId: String,
+        bucketName: String,
+        path: String?,
+        fileName: String,
+        inputStream: InputStream
+    ): BucketObjectEntry {
+        val provider = getProvider(providerId)
+        requireAllowedBucket(provider, bucketName)
+
+        val normalizedPath = normalizePath(path)
+        val key = if (normalizedPath.isBlank()) fileName else "$normalizedPath/$fileName"
+
+        val fileSystem = fileSystem(provider, bucketName)
+        val targetPath = fileSystem.getPath("/${key.trimStart('/')}").normalize()
+
+        // Ensure parent directories exist (S3 is flat, but the NIO provider may need it)
+        val parentDir = targetPath.parent
+        if (parentDir != null && !Files.exists(parentDir)) {
+            Files.createDirectories(parentDir)
+        }
+
+        Files.copy(inputStream, targetPath, StandardCopyOption.REPLACE_EXISTING)
+
+        val attributes = Files.readAttributes(targetPath, BasicFileAttributes::class.java)
+        return BucketObjectEntry(
+            name = fileName,
+            key = key,
+            type = BucketObjectType.FILE,
+            size = attributes.size(),
+            lastModified = attributes.lastModifiedTime()?.toInstant()?.takeIf { it != Instant.EPOCH }
+        )
+    }
+
+    override fun deleteObjects(providerId: String, bucketName: String, keys: List<String>) {
+        val provider = getProvider(providerId)
+        requireAllowedBucket(provider, bucketName)
+
+        val fileSystem = fileSystem(provider, bucketName)
+        val errors = mutableListOf<String>()
+
+        for (key in keys) {
+            val path = fileSystem.getPath("/${key.trimStart('/')}").normalize()
+            try {
+                if (Files.isDirectory(path)) {
+                    deleteRecursively(path)
+                } else {
+                    Files.deleteIfExists(path)
+                }
+            } catch (ex: Exception) {
+                errors.add("Failed to delete '$key': ${ex.message}")
+            }
+        }
+
+        if (errors.isNotEmpty()) {
+            throw S3ViewerException("Some objects could not be deleted: ${errors.joinToString("; ")}")
+        }
+    }
+
+    override fun searchObjects(
+        providerId: String,
+        bucketName: String,
+        query: String,
+        path: String?,
+        maxResults: Int
+    ): SearchResult {
+        val provider = getProvider(providerId)
+        requireAllowedBucket(provider, bucketName)
+
+        val normalizedPath = normalizePath(path)
+        val rootDir = resolveDirectory(provider, bucketName, normalizedPath)
+        val lowerQuery = query.lowercase()
+
+        val entries = Files.walk(rootDir).use { stream ->
+            stream
+                .filter { !Files.isDirectory(it) || it != rootDir }
+                .map { entry -> toEntry(rootDir, entry) }
+                .filter { it.name.lowercase().contains(lowerQuery) }
+                .sorted(compareBy<BucketObjectEntry> { it.type != BucketObjectType.DIRECTORY }.thenBy(String.CASE_INSENSITIVE_ORDER) { it.name })
+                .limit(maxResults.toLong())
+                .toList()
+        }
+
+        return SearchResult(
+            providerId = provider.id,
+            bucketName = bucketName,
+            query = query,
+            entries = entries
+        )
+    }
+
+    private fun deleteRecursively(path: Path) {
+        Files.walk(path).use { stream ->
+            stream.sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) }
+        }
     }
 
     private fun getProvider(providerId: String): S3ViewerProperties.Provider =
