@@ -9,7 +9,7 @@ plugins {
 }
 
 allprojects {
-    group = "org.openprojectx.s3.viewer.core"
+    group = "org.openprojectx.s3.viewer"
 }
 
 

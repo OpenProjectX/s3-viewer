@@ -22,6 +22,7 @@ val buildFiles = fileTree(rootDir) {
     include("**/*.gradle", "**/*.gradle.kts")
     exclude(
         "build",
+        "**/build/**",
         "**/gradle",
         "settings.gradle",
         "settings.gradle.kts",

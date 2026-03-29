@@ -9,6 +9,7 @@ kotlinxSerializationJSON = "1.9.0"
 kotlinxCoroutines = "1.10.2"
 springBoot = "4.0.5"
 nodeGradle = "7.1.0"
+awsJavaNioS3 = "2.3.0"
 
 [libraries]
 kotlinGradlePlugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
@@ -17,6 +18,7 @@ kotlinSpringPlugin = { module = "org.jetbrains.kotlin.plugin.spring:org.jetbrain
 kotlinxDatetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinxDatetime" }
 kotlinxSerialization = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerializationJSON" }
 kotlinxCoroutines = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinxCoroutines" }
+awsJavaNioS3 = { module = "software.amazon.nio.s3:aws-java-nio-spi-for-s3", version.ref = "awsJavaNioS3" }
 
 # Libraries can be bundled together for easier import
 [bundles]
