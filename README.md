@@ -52,21 +52,7 @@ s3-viewer:
         - another-bucket
 ```
 
-For LocalStack (dev profile):
-
-```yaml
-s3-viewer:
-  providers:
-    - id: localstack
-      name: LocalStack
-      endpoint: http://localhost:4566
-      region: us-east-1
-      access-key: test
-      secret-key: test
-      path-style-access: true
-      buckets:
-        - demo-assets
-```
+For LocalStack (dev profile), see `app/src/main/resources/application-dev.yaml`.
 
 ## UI
 
@@ -86,27 +72,8 @@ In dev mode the Vite server proxies `/api` requests to the Spring app on port `8
 ## Building & running
 
 ```bash
-# Run the Spring backend (dev profile includes LocalStack config)
-./gradlew :app:bootRun -Dspring.profiles.active=dev
-
-# Run the UI dev server (hot reload, proxies /api → :8081)
-./gradlew :ui:yarnDev
-
-# Build the UI only
-./gradlew :ui:yarnBuild
-
-# Build a self-contained JAR (bundles compiled UI into classpath:/static/)
+# Build a self-contained JAR (builds UI, copies dist into static/)
 ./gradlew :app:bootJar
 ```
 
-The `bootJar` task automatically runs `yarnBuild` and copies `ui/dist/` into the JAR's `static/` resources, so the Spring app serves the frontend at `/`.
-
-## Regenerating the API
-
-After editing `api.yaml`, regenerate the Spring interfaces and models:
-
-```bash
-./gradlew :app:openApiGenerate
-```
-
-The generated code lands in `app/build/generate-resources/main/src/main/java/`.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full dev setup, Dev Container instructions, and how to run the app locally.

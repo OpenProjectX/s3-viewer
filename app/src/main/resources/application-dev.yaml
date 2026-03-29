@@ -6,7 +6,7 @@ s3-viewer:
   providers:
     - id: localstack
       name: LocalStack
-      endpoint: http://localhost:4566
+      endpoint: ${LOCALSTACK_ENDPOINT:http://localhost:4566}
       region: us-east-1
       access-key: test
       secret-key: test

@@ -1,0 +1,36 @@
+{
+  "name": "S3 Viewer Dev",
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "app",
+  "workspaceFolder": "/workspaces/s3-viewer",
+
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": { "version": "20" }
+  },
+
+  "remoteEnv": {
+    // Overrides the default localhost endpoint so Spring Boot reaches LocalStack
+    // via the docker-compose service name instead of localhost.
+    "LOCALSTACK_ENDPOINT": "http://localstack:4566"
+  },
+
+  "postCreateCommand": "cd ui && yarn install",
+
+  "forwardPorts": [8081, 5173, 4566],
+  "portsAttributes": {
+    "8081": { "label": "Spring App" },
+    "5173": { "label": "Vite Dev Server" },
+    "4566": { "label": "LocalStack S3" }
+  },
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "vscjava.vscode-java-pack",
+        "vmware.vscode-spring-boot",
+        "esbenp.prettier-vscode",
+        "dbaeumer.vscode-eslint"
+      ]
+    }
+  }
+}

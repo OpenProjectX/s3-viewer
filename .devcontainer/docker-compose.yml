@@ -1,0 +1,33 @@
+services:
+  app:
+    image: mcr.microsoft.com/devcontainers/java:17-bullseye
+    volumes:
+      - ../:/workspaces/s3-viewer:cached
+      - gradle-cache:/home/vscode/.gradle
+    command: sleep infinity
+    depends_on:
+      localstack:
+        condition: service_healthy
+
+  localstack:
+    image: localstack/localstack:4
+    ports:
+      - "127.0.0.1:4566:4566"
+    environment:
+      SERVICES: s3
+      AWS_DEFAULT_REGION: us-east-1
+      LOCALSTACK_HOST: localstack
+    volumes:
+      - ./init-aws.sh:/etc/localstack/init/ready.d/init-aws.sh:ro
+      - localstack-data:/var/lib/localstack
+      - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test: ["CMD", "awslocal", "s3", "ls"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  gradle-cache:
+  localstack-data:
