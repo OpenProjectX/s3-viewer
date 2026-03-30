@@ -209,7 +209,7 @@ internal class DefaultS3ViewerService(
         normalizedPath: String
     ): Path {
         val fileSystem = fileSystem(provider, bucketName)
-        val rawPath = if (normalizedPath.isBlank()) "/" else "/$normalizedPath"
+        val rawPath = if (normalizedPath.isBlank()) "/" else "/$normalizedPath/"
         val path = fileSystem.getPath(rawPath).normalize()
         if (!Files.exists(path)) {
             throw S3ViewerException("Path '$normalizedPath' was not found in bucket '$bucketName'")
