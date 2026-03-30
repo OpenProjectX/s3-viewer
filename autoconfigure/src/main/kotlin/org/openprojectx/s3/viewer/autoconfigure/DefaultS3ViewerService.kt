@@ -238,15 +238,18 @@ internal class DefaultS3ViewerService(
         }
 
     private fun toEntry(baseDirectory: Path, entry: Path): BucketObjectEntry {
-        val attributes = Files.readAttributes(entry, BasicFileAttributes::class.java)
+        val absoluteBaseDirectory = baseDirectory.toAbsolutePath().normalize()
+        val absoluteEntry = entry.toAbsolutePath().normalize()
+
+        val attributes = Files.readAttributes(absoluteEntry, BasicFileAttributes::class.java)
         val type = if (attributes.isDirectory) BucketObjectType.DIRECTORY else BucketObjectType.FILE
-        val relative = baseDirectory.relativize(entry).invariantSeparatorsPathString.trim('/')
-        val normalizedKey = listOf(baseDirectory.invariantSeparatorsPathString.trim('/'), relative)
+        val relative = absoluteBaseDirectory.relativize(absoluteEntry).invariantSeparatorsPathString.trim('/')
+        val normalizedKey = listOf(absoluteBaseDirectory.invariantSeparatorsPathString.trim('/'), relative)
             .filter { it.isNotBlank() }
             .joinToString("/")
 
         return BucketObjectEntry(
-            name = entry.name.ifBlank { normalizedKey.ifBlank { "/" } },
+            name = absoluteEntry.name.ifBlank { normalizedKey.ifBlank { "/" } },
             key = normalizedKey,
             type = type,
             size = if (attributes.isRegularFile) attributes.size() else null,
