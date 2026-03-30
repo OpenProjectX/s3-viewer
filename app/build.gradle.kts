@@ -83,35 +83,21 @@ openApiGenerate {
 }
 
 
+val openApiGenerateTask = tasks.named("openApiGenerate")
+
 sourceSets {
-//    named("main") {
-//        java.srcDir(openApiOutputDir.map { it.dir("src/main/java") })
-//        kotlin.srcDir(openApiOutputDir.map { it.dir("src/main/kotlin") })
-//    }
-
     main {
-
         java {
-            srcDir(layout.buildDirectory.dir("generate-resources/main/src/main/java"))
+            srcDir(openApiGenerateTask.map {
+                layout.buildDirectory.dir("generate-resources/main/src/main/java").get()
+            })
         }
-
         kotlin {
-            srcDir(layout.buildDirectory.dir("generate-resources/main/src/main/kotlin"))
-
+            srcDir(openApiGenerateTask.map {
+                layout.buildDirectory.dir("generate-resources/main/src/main/kotlin").get()
+            })
         }
     }
-}
-
-tasks.named("compileJava") {
-    dependsOn(tasks.named("openApiGenerate"))
-}
-
-tasks.named("compileKotlin") {
-    dependsOn(tasks.named("openApiGenerate"))
-}
-
-tasks.withType<Jar>().configureEach {
-    dependsOn(tasks.named("openApiGenerate"))
 }
 
 dependencies {
