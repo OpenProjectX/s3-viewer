@@ -1,6 +1,8 @@
 services:
   app:
-    image: mcr.microsoft.com/devcontainers/java:17-bullseye
+    build:
+      context: .
+      dockerfile: Dockerfile
     volumes:
       - ../:/workspaces/s3-viewer:cached
       - gradle-cache:/home/vscode/.gradle

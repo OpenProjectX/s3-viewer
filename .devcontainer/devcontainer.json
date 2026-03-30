@@ -4,10 +4,6 @@
   "service": "app",
   "workspaceFolder": "/workspaces/s3-viewer",
 
-  "features": {
-    "ghcr.io/devcontainers/features/node:1": { "version": "20" }
-  },
-
   "remoteEnv": {
     // Overrides the default localhost endpoint so Spring Boot reaches LocalStack
     // via the docker-compose service name instead of localhost.

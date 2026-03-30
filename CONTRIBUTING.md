@@ -10,7 +10,7 @@
 
 ### Option A — Dev Container (recommended)
 
-A fully configured Dev Container is provided in `.devcontainer/`. It includes Java 17, Node 20, and a LocalStack sidecar that auto-creates the demo S3 buckets on startup.
+A fully configured Dev Container is provided in `.devcontainer/`. The app container is built from `.devcontainer/Dockerfile` (Java 17 + Node 20 + Yarn) and a LocalStack sidecar auto-creates the demo S3 buckets on startup.
 
 **Requirements:** Docker + a Dev Container-compatible IDE.
 
