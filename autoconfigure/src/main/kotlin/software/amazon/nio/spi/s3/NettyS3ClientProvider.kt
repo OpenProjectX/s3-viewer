@@ -2,6 +2,7 @@ package software.amazon.nio.spi.s3
 
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider
+import software.amazon.awssdk.core.client.config.ClientOverrideConfiguration
 import software.amazon.awssdk.http.Protocol
 import software.amazon.awssdk.http.nio.netty.NettyNioAsyncHttpClient
 import software.amazon.awssdk.regions.Region
@@ -25,6 +26,11 @@ internal class NettyS3ClientProvider(
             .httpClient(httpClient)
             .region(Region.of(config.getRegion()))
             .forcePathStyle(config.getForcePathStyle())
+            .overrideConfiguration(
+                ClientOverrideConfiguration.builder()
+                    .addExecutionInterceptor(LoggingExecutionInterceptor())
+                    .build()
+            )
 
         config.endpointUri()?.let { builder.endpointOverride(it) }
 

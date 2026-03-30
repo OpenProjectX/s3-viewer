@@ -14,6 +14,16 @@ s3-viewer:
       buckets:
         - demo-assets
         - demo-archive
+    - id: rustfs
+      name: rustfs
+      endpoint: https://s3.cn-guangzhou-a.k8s.openprojectx.org
+      region: us-east-1
+      access-key: ${RUSTFS_ACCESS_KEY:test}
+      secret-key: ${RUSTFS_SECRET_KEY:test}
+      path-style-access: true
+      buckets:
+        - data
+
 logging:
   level:
     "software.amazon": "TRACE"

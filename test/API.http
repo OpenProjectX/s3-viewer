@@ -2,11 +2,12 @@
 GET {{baseUrl}}/api/v1/providers
 
 ###
+@providerId = rustfs
 GET {{baseUrl}}/api/v1/providers/{{providerId}}/buckets
 
-###
-GET {{baseUrl}}/api/v1/providers/{{providerId}}/buckets/{{bucketName}}/browse?
-    path={{$random.alphanumeric(8)}}
+### browse
+@bucketName = data
+GET {{baseUrl}}/api/v1/providers/{{providerId}}/buckets/{{bucketName}}/browse?path=iceberg
 
 ###
 GET {{baseUrl}}/api/v1/providers/{{providerId}}/buckets/{{bucketName}}/download?
