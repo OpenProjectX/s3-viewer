@@ -74,6 +74,8 @@ In dev mode the Vite server proxies `/api` requests to the Spring app on port `8
 ```bash
 # Build a self-contained JAR (builds UI, copies dist into static/)
 ./gradlew :app:bootJar
+
+./gradlew release -Prelease.useAutomaticVersion=true
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the full dev setup, Dev Container instructions, and how to run the app locally.
