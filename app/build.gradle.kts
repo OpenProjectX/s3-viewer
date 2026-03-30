@@ -110,6 +110,10 @@ tasks.named("compileKotlin") {
     dependsOn(tasks.named("openApiGenerate"))
 }
 
+tasks.named("kotlinSourcesJar") {
+    dependsOn(tasks.named("openApiGenerate"))
+}
+
 dependencies {
 
     implementation(project(":s3-viewer-spring-boot-starter"))
