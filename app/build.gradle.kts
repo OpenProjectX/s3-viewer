@@ -110,7 +110,7 @@ tasks.named("compileKotlin") {
     dependsOn(tasks.named("openApiGenerate"))
 }
 
-tasks.named("kotlinSourcesJar") {
+tasks.withType<Jar>().configureEach {
     dependsOn(tasks.named("openApiGenerate"))
 }
 
