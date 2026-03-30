@@ -1,0 +1,25 @@
+services:
+  localstack:
+    image: docker.io/localstack/localstack:4.14.0
+    ports:
+      - "127.0.0.1:4566:4566"
+    environment:
+      http_proxy: ""
+      https_proxy: ""
+      HTTP_PROXY: ""
+      HTTPS_PROXY: ""
+      ALL_PROXY: ""
+      all_proxy: ""
+    volumes:
+      - ./.devcontainer/init-aws.sh:/etc/localstack/init/ready.d/init-aws.sh:ro
+      - localstack-data:/var/lib/localstack
+      - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test: ["CMD", "awslocal", "s3", "ls"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  localstack-data:

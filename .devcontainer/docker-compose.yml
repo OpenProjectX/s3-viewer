@@ -3,6 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    image: s3-viewer-devcontainer:latest
     volumes:
       - ../:/workspaces/s3-viewer:cached
       - gradle-cache:/home/vscode/.gradle
@@ -12,7 +13,7 @@ services:
         condition: service_healthy
 
   localstack:
-    image: localstack/localstack:4
+    image: docker.io/localstack/localstack:4
     ports:
       - "127.0.0.1:4566:4566"
     environment:

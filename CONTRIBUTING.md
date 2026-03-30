@@ -10,9 +10,11 @@
 
 ### Option A — Dev Container (recommended)
 
-A fully configured Dev Container is provided in `.devcontainer/`. The app container is built from `.devcontainer/Dockerfile` (Java 17 + Node 20 + Yarn) and a LocalStack sidecar auto-creates the demo S3 buckets on startup.
+A fully configured Dev Container is provided in `.devcontainer/`. It includes Java 17, Node 20 (via devcontainer feature), and a LocalStack sidecar that auto-creates the demo S3 buckets on startup.
 
 **Requirements:** Docker + a Dev Container-compatible IDE.
+
+> **Docker Desktop setting required:** Go to *Settings → General* and **uncheck "Use containerd for pulling and storing images"**, then apply and restart. With containerd enabled, JetBrains cannot resolve the built image by ID (BuildKit config digest vs. containerd manifest digest mismatch) and the container will fail to start.
 
 #### VS Code
 
@@ -51,18 +53,15 @@ A fully configured Dev Container is provided in `.devcontainer/`. The app contai
 
 ---
 
-### Option B — Local dev (no Docker)
+### Option B — Local dev with docker-compose
 
-Run LocalStack yourself:
+A `docker-compose.yml` at the repo root starts LocalStack and creates the demo buckets automatically:
 
 ```bash
-pip install localstack awscli-local
-localstack start -d
-awslocal s3 mb s3://demo-assets
-awslocal s3 mb s3://demo-archive
+docker-compose up -d
 ```
 
-`LOCALSTACK_ENDPOINT` defaults to `http://localhost:4566` in `application-dev.yaml`, so no extra config is needed.
+`LOCALSTACK_ENDPOINT` defaults to `http://localhost:4566` in `application-dev.yaml`, so no extra config is needed. Stop LocalStack with `docker-compose down` (bucket data persists in the `localstack-data` volume across restarts).
 
 ---
 
