@@ -1,11 +1,63 @@
+import org.openapitools.generator.gradle.plugin.tasks.GenerateTask
+
 plugins {
     id("buildsrc.convention.kotlin-jvm")
     `kotlin-kapt`
+    id("org.openapi.generator") version "7.20.0"
+    kotlin("plugin.spring")
 }
 
+val openApiGenerateTask = tasks.named("openApiGenerate")
+
+openApiGenerate {
+    generatorName.set("spring")
+    inputSpec.set("$projectDir/src/main/resources/openapi/api.yaml")
+    apiPackage.set("org.openprojectx.s3.viewer.autoconfigure.api")
+    modelPackage.set("org.openprojectx.s3.viewer.autoconfigure.model")
+    invokerPackage.set("org.openprojectx.s3.viewer.autoconfigure.invoker")
+    configOptions.set(
+        mapOf(
+            "useTags" to "true",
+            "interfaceOnly" to "true",
+            "reactive" to "true",
+            "useSpringBoot4" to "true",
+            "useJakartaEe" to "true",
+            "dateLibrary" to "java8"
+        )
+    )
+}
+
+sourceSets {
+    main {
+        java {
+            srcDir(openApiGenerateTask.map {
+                layout.buildDirectory.dir("generate-resources/main/src/main/java").get()
+            })
+        }
+        kotlin {
+            srcDir(openApiGenerateTask.map {
+                layout.buildDirectory.dir("generate-resources/main/src/main/kotlin").get()
+            })
+        }
+    }
+}
+
+val copyUiDist = tasks.register<Copy>("copyUiDist") {
+    val uiProject = project(":ui")
+    dependsOn(uiProject.tasks.named("yarnBuild"))
+    from(uiProject.layout.projectDirectory.dir("dist"))
+    into(layout.buildDirectory.dir("resources/main/static/s3-viewer/ui"))
+}
+
+tasks.named("processResources") {
+    dependsOn(copyUiDist)
+}
+
+tasks.withType<Jar>().configureEach {
+    dependsOn(copyUiDist)
+}
 
 dependencies {
-
     api(project(":core"))
 
     val bootBom = platform("org.springframework.boot:spring-boot-dependencies:${libs.versions.springBoot.get()}")
@@ -15,6 +67,9 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-autoconfigure")
     api("org.springframework.boot:spring-boot-starter")
     implementation("org.springframework.boot:spring-boot-starter-validation")
+    implementation("org.springframework.boot:spring-boot-starter-webflux")
+    implementation("org.springdoc:springdoc-openapi-starter-webflux-ui:3.0.2")
+    implementation("org.openapitools:jackson-databind-nullable:0.2.10")
     implementation(libs.awsJavaNioS3)
 
     implementation(platform("software.amazon.awssdk:bom:2.39.2"))
@@ -23,7 +78,4 @@ dependencies {
     implementation("software.amazon.awssdk:s3")
 
     kapt("org.springframework.boot:spring-boot-configuration-processor")
-
-
-
 }

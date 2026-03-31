@@ -9,7 +9,7 @@ import type {
 } from '../types/api'
 
 const client = axios.create({
-  baseURL: '/api/v1',
+  baseURL: '/s3-viewer/api/v1',
 })
 
 export async function listProviders(): Promise<ProviderSummary[]> {
@@ -53,7 +53,7 @@ export function downloadObjectUrl(
   bucketName: string,
   key: string
 ): string {
-  return `/api/v1/providers/${providerId}/buckets/${bucketName}/download?key=${encodeURIComponent(key)}`
+  return `/s3-viewer/api/v1/providers/${providerId}/buckets/${bucketName}/download?key=${encodeURIComponent(key)}`
 }
 
 export async function uploadObject(

@@ -4,6 +4,7 @@ import path from 'path'
 
 export default defineConfig({
   plugins: [react()],
+  base: '/s3-viewer/ui/',
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
@@ -12,7 +13,7 @@ export default defineConfig({
   server: {
     port: 3000,
     proxy: {
-      '/api': {
+      '/s3-viewer/api': {
         target: 'http://localhost:8081',
         changeOrigin: true,
       },

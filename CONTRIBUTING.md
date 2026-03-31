@@ -82,10 +82,10 @@ The `bootJar` task automatically runs `yarnBuild` and bundles `ui/dist/` into `c
 
 ## Regenerating the API
 
-Controllers and models are generated from `app/src/main/resources/openapi/api.yaml`. After editing the spec, regenerate:
+Controllers and models are generated from `autoconfigure/src/main/resources/openapi/api.yaml`. After editing the spec, regenerate:
 
 ```bash
-./gradlew :app:openApiGenerate
+./gradlew :s3-viewer-spring-boot-autoconfigure:openApiGenerate
 ```
 
-Generated sources land in `app/build/generate-resources/main/src/main/java/`. **Do not edit these files directly.**
+Generated sources land in `autoconfigure/build/generate-resources/main/src/main/java/`. **Do not edit these files directly.**

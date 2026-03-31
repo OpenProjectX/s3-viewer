@@ -8,7 +8,7 @@ servers:
 tags:
   - name: Viewer
 paths:
-  /api/v1/providers:
+  /s3-viewer/api/v1/providers:
     get:
       tags: [Viewer]
       operationId: listProviders
@@ -22,7 +22,7 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/ProviderSummary"
-  /api/v1/providers/{providerId}/buckets:
+  /s3-viewer/api/v1/providers/{providerId}/buckets:
     get:
       tags: [Viewer]
       operationId: listBuckets
@@ -40,7 +40,7 @@ paths:
                   $ref: "#/components/schemas/BucketSummary"
         "404":
           $ref: "#/components/responses/NotFound"
-  /api/v1/providers/{providerId}/buckets/{bucketName}/browse:
+  /s3-viewer/api/v1/providers/{providerId}/buckets/{bucketName}/browse:
     get:
       tags: [Viewer]
       operationId: browseBucket
@@ -63,7 +63,7 @@ paths:
                 $ref: "#/components/schemas/BrowseResponse"
         "404":
           $ref: "#/components/responses/NotFound"
-  /api/v1/providers/{providerId}/buckets/{bucketName}/download:
+  /s3-viewer/api/v1/providers/{providerId}/buckets/{bucketName}/download:
     get:
       tags: [Viewer]
       operationId: downloadObject
@@ -87,7 +87,7 @@ paths:
                 format: binary
         "404":
           $ref: "#/components/responses/NotFound"
-  /api/v1/providers/{providerId}/buckets/{bucketName}/upload:
+  /s3-viewer/api/v1/providers/{providerId}/buckets/{bucketName}/upload:
     post:
       tags: [Viewer]
       operationId: uploadObject
@@ -122,7 +122,7 @@ paths:
                 $ref: "#/components/schemas/ObjectEntry"
         "404":
           $ref: "#/components/responses/NotFound"
-  /api/v1/providers/{providerId}/buckets/{bucketName}/objects:
+  /s3-viewer/api/v1/providers/{providerId}/buckets/{bucketName}/objects:
     delete:
       tags: [Viewer]
       operationId: deleteObjects
@@ -141,7 +141,7 @@ paths:
           description: Objects deleted successfully
         "404":
           $ref: "#/components/responses/NotFound"
-  /api/v1/providers/{providerId}/buckets/{bucketName}/search:
+  /s3-viewer/api/v1/providers/{providerId}/buckets/{bucketName}/search:
     get:
       tags: [Viewer]
       operationId: searchObjects

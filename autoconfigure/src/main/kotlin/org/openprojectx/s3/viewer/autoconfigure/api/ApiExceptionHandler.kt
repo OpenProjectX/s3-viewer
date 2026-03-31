@@ -1,6 +1,6 @@
-package org.openprojectx.s3.viewer.app.api
+package org.openprojectx.s3.viewer.autoconfigure.api
 
-import org.openprojectx.s3.viewer.app.model.ErrorResponse
+import org.openprojectx.s3.viewer.autoconfigure.model.ErrorResponse
 import org.openprojectx.s3.viewer.core.S3ViewerException
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity

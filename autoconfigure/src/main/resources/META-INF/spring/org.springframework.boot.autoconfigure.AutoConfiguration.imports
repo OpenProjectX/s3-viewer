@@ -1,1 +1,2 @@
 org.openprojectx.s3.viewer.autoconfigure.S3ViewerAutoConfiguration
+org.openprojectx.s3.viewer.autoconfigure.S3ViewerWebAutoConfiguration

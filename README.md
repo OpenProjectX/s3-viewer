@@ -6,27 +6,31 @@ Multi-cloud S3 browser built with Spring Boot WebFlux, Kotlin, OpenAPI-generated
 
 | Module | Purpose |
 |---|---|
-| `app` | Spring Boot application, OpenAPI contract, REST controllers |
-| `autoconfigure` | Configuration properties and `DefaultS3ViewerService` |
+| `app` | Standalone Spring Boot demo application |
+| `autoconfigure` | Auto-configuration: service, REST API, UI static assets |
 | `core` | Shared domain interfaces and types |
-| `starter` | Spring Boot starter for embedding the service |
+| `starter` | Spring Boot starter — add this one dependency to get everything |
 | `ui` | Vite + React + TypeScript + MUI frontend |
+
+Add the starter to your project and you get the full UI + REST API out of the box:
+- UI served at `/s3-viewer/ui/`
+- API served at `/s3-viewer/api/v1/`
 
 ## REST API
 
-All endpoints are under `/api/v1`. The OpenAPI spec is at `app/src/main/resources/openapi/api.yaml` and controllers are generated via the OpenAPI Generator Gradle plugin — **do not edit generated sources directly**.
+All endpoints are under `/s3-viewer/api/v1`. The OpenAPI spec is at `autoconfigure/src/main/resources/openapi/api.yaml` and controllers are generated via the OpenAPI Generator Gradle plugin — **do not edit generated sources directly**.
 
 ### Endpoints
 
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/providers` | List configured S3 providers |
-| `GET` | `/providers/{id}/buckets` | List buckets for a provider |
-| `GET` | `/providers/{id}/buckets/{name}/browse` | Browse objects at a path (`?path=prefix`) |
-| `GET` | `/providers/{id}/buckets/{name}/download` | Download an object (`?key=object/key`) |
-| `POST` | `/providers/{id}/buckets/{name}/upload` | Upload a file (`multipart/form-data`, `?path=prefix`) |
-| `DELETE` | `/providers/{id}/buckets/{name}/objects` | Delete objects (JSON body: `{"keys": [...]}`) |
-| `GET` | `/providers/{id}/buckets/{name}/search` | Search objects by name (`?query=term&path=prefix&maxResults=100`) |
+| `GET` | `/s3-viewer/api/v1/providers` | List configured S3 providers |
+| `GET` | `/s3-viewer/api/v1/providers/{id}/buckets` | List buckets for a provider |
+| `GET` | `/s3-viewer/api/v1/providers/{id}/buckets/{name}/browse` | Browse objects at a path (`?path=prefix`) |
+| `GET` | `/s3-viewer/api/v1/providers/{id}/buckets/{name}/download` | Download an object (`?key=object/key`) |
+| `POST` | `/s3-viewer/api/v1/providers/{id}/buckets/{name}/upload` | Upload a file (`multipart/form-data`, `?path=prefix`) |
+| `DELETE` | `/s3-viewer/api/v1/providers/{id}/buckets/{name}/objects` | Delete objects (JSON body: `{"keys": [...]}`) |
+| `GET` | `/s3-viewer/api/v1/providers/{id}/buckets/{name}/search` | Search objects by name (`?query=term&path=prefix&maxResults=100`) |
 
 ### Breaking changes from 0.1.x
 
@@ -67,7 +71,7 @@ The `ui` module is a React + Vite + MUI single-page application. Features:
 - **Download** — direct download button per file
 - **Delete** — multi-select with confirmation dialog
 
-In dev mode the Vite server proxies `/api` requests to the Spring app on port `8081`.
+In dev mode the Vite server proxies `/s3-viewer/api` requests to the Spring app on port `8081`.
 
 ## Building & running
 

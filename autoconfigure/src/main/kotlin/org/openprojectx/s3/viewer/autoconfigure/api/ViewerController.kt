@@ -1,18 +1,17 @@
-package org.openprojectx.s3.viewer.app.api
+package org.openprojectx.s3.viewer.autoconfigure.api
 
 import jakarta.validation.Valid
 import jakarta.validation.constraints.NotNull
-import org.openprojectx.s3.viewer.app.model.BrowseResponse
-import org.openprojectx.s3.viewer.app.model.BucketSummary
-import org.openprojectx.s3.viewer.app.model.DeleteRequest
-import org.openprojectx.s3.viewer.app.model.ObjectEntry
-import org.openprojectx.s3.viewer.app.model.ObjectEntryType
-import org.openprojectx.s3.viewer.app.model.ProviderSummary
-import org.openprojectx.s3.viewer.app.model.SearchResponse
+import org.openprojectx.s3.viewer.autoconfigure.model.BrowseResponse
+import org.openprojectx.s3.viewer.autoconfigure.model.BucketSummary
+import org.openprojectx.s3.viewer.autoconfigure.model.DeleteRequest
+import org.openprojectx.s3.viewer.autoconfigure.model.ObjectEntry
+import org.openprojectx.s3.viewer.autoconfigure.model.ObjectEntryType
+import org.openprojectx.s3.viewer.autoconfigure.model.ProviderSummary
+import org.openprojectx.s3.viewer.autoconfigure.model.SearchResponse
 import org.openprojectx.s3.viewer.core.BucketBrowseResult
 import org.openprojectx.s3.viewer.core.BucketObjectEntry
 import org.openprojectx.s3.viewer.core.BucketObjectType
-import org.openprojectx.s3.viewer.core.S3ViewerException
 import org.openprojectx.s3.viewer.core.S3ViewerService
 import org.openprojectx.s3.viewer.core.SearchResult
 import org.openprojectx.s3.viewer.core.ViewerBucket
@@ -84,8 +83,7 @@ class ViewerController(
         path: @Valid String?,
         exchange: ServerWebExchange
     ): Mono<ResponseEntity<ObjectEntry>> {
-
-        val fileName = filePart.name()
+        val fileName = (filePart as FilePart).filename()
         return filePart.content().reduce(
             java.io.ByteArrayOutputStream(),
             { baos, dataBuffer ->
@@ -100,7 +98,6 @@ class ViewerController(
                 providerId, bucketName, path, fileName, baos.toByteArray().inputStream()
             )
             ResponseEntity.status(HttpStatus.CREATED).body(entry.toApiModel())
-
         }
     }
 
