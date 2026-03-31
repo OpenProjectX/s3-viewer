@@ -42,19 +42,12 @@ sourceSets {
     }
 }
 
-val copyUiDist = tasks.register<Copy>("copyUiDist") {
+tasks.named<ProcessResources>("processResources") {
     val uiProject = project(":ui")
     dependsOn(uiProject.tasks.named("yarnBuild"))
-    from(uiProject.layout.projectDirectory.dir("dist"))
-    into(layout.buildDirectory.dir("resources/main/static/s3-viewer/ui"))
-}
-
-tasks.named("processResources") {
-    dependsOn(copyUiDist)
-}
-
-tasks.withType<Jar>().configureEach {
-    dependsOn(copyUiDist)
+    from(uiProject.layout.projectDirectory.dir("dist")) {
+        into("static/s3-viewer/ui")
+    }
 }
 
 dependencies {
