@@ -80,6 +80,36 @@ docker-compose up -d
 
 The `bootJar` task automatically runs `yarnBuild` and bundles `ui/dist/` into `classpath:/static/`, so the Spring app serves the frontend at `/`.
 
+## Testing
+
+### API integration tests
+
+Uses Testcontainers (LocalStack) + Spring `WebTestClient`. LocalStack starts automatically — no extra setup needed.
+
+```bash
+./gradlew :app:test
+```
+
+E2E tests are excluded by default (`@Tag("e2e")`).
+
+### Playwright E2E tests
+
+Runs Playwright (Chromium) against the full stack: Spring Boot + LocalStack + built UI.
+
+First-time setup — install browser binaries (one-off, ~300 MB):
+
+```bash
+./gradlew :app:playwrightInstall
+```
+
+Then run:
+
+```bash
+./gradlew :app:e2eTest
+```
+
+> In the Dev Container, browser system dependencies are installed automatically by `playwrightInstall` via `--with-deps`. On a bare host, ensure Chromium system libs are present or use the Dev Container.
+
 ## Regenerating the API
 
 Controllers and models are generated from `autoconfigure/src/main/resources/openapi/api.yaml`. After editing the spec, regenerate:

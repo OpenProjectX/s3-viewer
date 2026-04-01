@@ -1,0 +1,11 @@
+s3-viewer:
+  providers:
+    - id: test
+      name: Test LocalStack
+      endpoint: http://placeholder  # overridden by @DynamicPropertySource in tests
+      region: us-east-1
+      access-key: test
+      secret-key: test
+      path-style-access: true
+      buckets:
+        - test-bucket
