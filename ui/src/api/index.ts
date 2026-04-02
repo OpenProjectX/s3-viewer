@@ -8,9 +8,17 @@ import type {
   SearchResponse,
 } from '../types/api'
 
-const client = axios.create({
-  baseURL: '/s3-viewer/api/v1',
-})
+declare global {
+  interface Window {
+    __S3_VIEWER_CONFIG__?: { apiBase: string }
+  }
+}
+
+// Resolved at runtime from config.js injected by Spring Boot.
+// Falls back to the default path for local dev convenience.
+const apiBase = window.__S3_VIEWER_CONFIG__?.apiBase ?? '/s3-viewer/api/v1'
+
+const client = axios.create({ baseURL: apiBase })
 
 export async function listProviders(): Promise<ProviderSummary[]> {
   const { data } = await client.get<ProviderSummary[]>('/providers')
@@ -53,7 +61,7 @@ export function downloadObjectUrl(
   bucketName: string,
   key: string
 ): string {
-  return `/s3-viewer/api/v1/providers/${providerId}/buckets/${bucketName}/download?key=${encodeURIComponent(key)}`
+  return `${apiBase}/providers/${providerId}/buckets/${bucketName}/download?key=${encodeURIComponent(key)}`
 }
 
 export async function uploadObject(

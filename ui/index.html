@@ -2,9 +2,14 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>S3 Viewer</title>
+    <!--
+      config.js is served dynamically by Spring Boot and writes window.__S3_VIEWER_CONFIG__.
+      In Vite dev mode a mock is served by the devConfigPlugin in vite.config.ts.
+      The script is intentionally non-module so it runs before the React bundle.
+    -->
+    <script src="config.js"></script>
   </head>
   <body>
     <div id="root"></div>

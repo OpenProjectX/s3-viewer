@@ -1,6 +1,8 @@
 spring:
   application:
     name: s3-viewer
+  webflux:
+    base-path: /dev/service
 
 s3-viewer:
   providers:
@@ -23,6 +25,8 @@ s3-viewer:
       path-style-access: true
       buckets:
         - data
+  ui:
+    api-base-path: /dev/service/s3-viewer/api
 
 logging:
   level:

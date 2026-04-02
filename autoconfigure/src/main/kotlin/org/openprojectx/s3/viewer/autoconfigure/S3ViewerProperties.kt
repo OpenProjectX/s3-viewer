@@ -9,8 +9,19 @@ import org.springframework.validation.annotation.Validated
 @ConfigurationProperties("s3-viewer")
 data class S3ViewerProperties(
     @field:Valid
-    val providers: List<Provider> = emptyList()
+    val providers: List<Provider> = emptyList(),
+    val ui: UiProperties = UiProperties()
 ) {
+    data class UiProperties(
+        /**
+         * Base path of the S3 Viewer REST API, without a trailing slash.
+         * Override this when the application is deployed behind a reverse proxy that does not
+         * strip the context prefix (e.g. set to "/prod/service/s3-viewer/api").
+         * Default matches the out-of-the-box Spring Boot path.
+         */
+        val apiBasePath: String = "/s3-viewer/api"
+    )
+
     data class Provider(
         @field:NotBlank
         val id: String,

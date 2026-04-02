@@ -58,6 +58,18 @@ s3-viewer:
 
 For LocalStack (dev profile), see `app/src/main/resources/application-dev.yaml`.
 
+### Reverse proxy / context path
+
+When the application sits behind a reverse proxy that **does not strip** its path prefix, tell the UI where the API lives:
+
+```yaml
+s3-viewer:
+  ui:
+    api-base-path: /prod/service/s3-viewer/api   # default: /s3-viewer/api
+```
+
+Spring Boot serves `GET /s3-viewer/ui/config.js` which injects this value into the browser as `window.__S3_VIEWER_CONFIG__.apiBase` before the React bundle runs. The UI assets themselves use relative paths in the build output so they work under any prefix without configuration.
+
 ## UI
 
 The `ui` module is a React + Vite + MUI single-page application. Features:
