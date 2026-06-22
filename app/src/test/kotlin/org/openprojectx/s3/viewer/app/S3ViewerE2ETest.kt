@@ -41,14 +41,31 @@ class S3ViewerE2ETest {
         @Container
         @JvmField
         val localstack: LocalStackContainer =
-            LocalStackContainer(DockerImageName.parse("docker.io/localstack/localstack:4"))
+            LocalStackContainer(
+                DockerImageName.parse("docker.io/localstack/localstack:4")
+                    .asCompatibleSubstituteFor("localstack/localstack")
+            )
                 .withServices(S3)
 
         @JvmStatic
         @DynamicPropertySource
         fun configureProperties(registry: DynamicPropertyRegistry) {
+            registry.add("s3-viewer.providers[0].id") { "test" }
+            registry.add("s3-viewer.providers[0].name") { "Test LocalStack" }
+            registry.add("s3-viewer.providers[0].region") { "us-east-1" }
+            registry.add("s3-viewer.providers[0].access-key") { "test" }
+            registry.add("s3-viewer.providers[0].secret-key") { "test" }
+            registry.add("s3-viewer.providers[0].path-style-access") { true }
+            registry.add("s3-viewer.providers[0].buckets[0]") { "test-bucket" }
             registry.add("s3-viewer.providers[0].endpoint") {
+                ensureLocalstackStarted()
                 localstack.getEndpointOverride(S3).toString()
+            }
+        }
+
+        private fun ensureLocalstackStarted() {
+            if (!localstack.isRunning) {
+                localstack.start()
             }
         }
     }
@@ -62,6 +79,7 @@ class S3ViewerE2ETest {
 
     @BeforeAll
     fun seedData() {
+        ensureLocalstackStarted()
         val s3 = S3Client.builder()
             .endpointOverride(localstack.getEndpointOverride(S3))
             .credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create("test", "test")))

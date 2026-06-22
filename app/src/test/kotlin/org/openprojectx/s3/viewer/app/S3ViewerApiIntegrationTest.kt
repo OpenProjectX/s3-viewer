@@ -3,9 +3,9 @@ package org.openprojectx.s3.viewer.app
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
-import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment.RANDOM_PORT
+import org.springframework.boot.test.web.server.LocalServerPort
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
@@ -33,23 +33,46 @@ class S3ViewerApiIntegrationTest {
         @Container
         @JvmField
         val localstack: LocalStackContainer =
-            LocalStackContainer(DockerImageName.parse("docker.io/localstack/localstack:4"))
+            LocalStackContainer(
+                DockerImageName.parse("docker.io/localstack/localstack:4")
+                    .asCompatibleSubstituteFor("localstack/localstack")
+            )
                 .withServices(S3)
 
         @JvmStatic
         @DynamicPropertySource
         fun configureProperties(registry: DynamicPropertyRegistry) {
+            registry.add("s3-viewer.providers[0].id") { "test" }
+            registry.add("s3-viewer.providers[0].name") { "Test LocalStack" }
+            registry.add("s3-viewer.providers[0].region") { "us-east-1" }
+            registry.add("s3-viewer.providers[0].access-key") { "test" }
+            registry.add("s3-viewer.providers[0].secret-key") { "test" }
+            registry.add("s3-viewer.providers[0].path-style-access") { true }
+            registry.add("s3-viewer.providers[0].buckets[0]") { "test-bucket" }
             registry.add("s3-viewer.providers[0].endpoint") {
+                ensureLocalstackStarted()
                 localstack.getEndpointOverride(S3).toString()
+            }
+        }
+
+        private fun ensureLocalstackStarted() {
+            if (!localstack.isRunning) {
+                localstack.start()
             }
         }
     }
 
-    @Autowired
-    lateinit var webTestClient: WebTestClient
+    @LocalServerPort
+    private var port: Int = 0
+
+    private val webTestClient: WebTestClient
+        get() = WebTestClient.bindToServer()
+            .baseUrl("http://localhost:$port")
+            .build()
 
     @BeforeAll
     fun seedData() {
+        ensureLocalstackStarted()
         val s3 = S3Client.builder()
             .endpointOverride(localstack.getEndpointOverride(S3))
             .credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create("test", "test")))

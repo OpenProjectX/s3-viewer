@@ -60,7 +60,8 @@ internal open class DefaultS3ViewerService(
         val directory = resolveDirectory(provider, bucketName, normalizedPath)
         val entries = Files.list(directory).use { stream ->
             stream
-                .map { entry -> toEntry(directory, entry) }
+                .map { entry -> toImmediateEntry(directory, normalizedPath, entry) }
+                .distinct()
                 .sorted(compareBy<BucketObjectEntry> { it.type != BucketObjectType.DIRECTORY }.thenBy(String.CASE_INSENSITIVE_ORDER) { it.name })
                 .toList()
         }
@@ -247,14 +248,36 @@ internal open class DefaultS3ViewerService(
         val normalizedKey = listOf(absoluteBaseDirectory.invariantSeparatorsPathString.trim('/'), relative)
             .filter { it.isNotBlank() }
             .joinToString("/")
+        val rawName = absoluteEntry.name.ifBlank { normalizedKey.ifBlank { "/" } }
 
         return BucketObjectEntry(
-            name = absoluteEntry.name.ifBlank { normalizedKey.ifBlank { "/" } },
+            name = if (type == BucketObjectType.DIRECTORY) rawName.trimEnd('/') else rawName,
             key = normalizedKey,
             type = type,
             size = if (attributes.isRegularFile) attributes.size() else null,
             lastModified = attributes.lastModifiedTime()?.toInstant()?.takeIf { it != Instant.EPOCH }
         )
+    }
+
+    private fun toImmediateEntry(baseDirectory: Path, normalizedPath: String, entry: Path): BucketObjectEntry {
+        val absoluteBaseDirectory = baseDirectory.toAbsolutePath().normalize()
+        val absoluteEntry = entry.toAbsolutePath().normalize()
+        val relative = absoluteBaseDirectory.relativize(absoluteEntry).invariantSeparatorsPathString.trim('/')
+
+        if ('/' in relative) {
+            val directoryName = relative.substringBefore('/').trimEnd('/')
+            val key = listOf(normalizedPath, directoryName)
+                .filter { it.isNotBlank() }
+                .joinToString("/")
+
+            return BucketObjectEntry(
+                name = directoryName,
+                key = key,
+                type = BucketObjectType.DIRECTORY
+            )
+        }
+
+        return toEntry(baseDirectory, entry)
     }
 
     private fun normalizePath(path: String?): String =
