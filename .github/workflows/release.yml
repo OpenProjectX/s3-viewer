@@ -91,6 +91,11 @@ jobs:
           restore-keys: |
             jib-${{ runner.os }}-
 
+      - name: Cache Docker images
+        uses: ScribeMD/docker-cache@0.5.0
+        with:
+          key: docker-images-${{ runner.os }}-${{ hashFiles('app/src/test/kotlin/org/openprojectx/s3/viewer/app/S3ViewerLocalStackIntegrationTest.kt', 'app/build.gradle.kts', 'gradle/libs.versions.toml') }}
+
       - name: Configure git
         run: |
           git config user.name "github-actions[bot]"
