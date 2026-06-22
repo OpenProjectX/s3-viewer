@@ -34,12 +34,14 @@ import ViewListIcon from '@mui/icons-material/ViewList'
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward'
 import DownloadIcon from '@mui/icons-material/Download'
 import VisibilityIcon from '@mui/icons-material/Visibility'
+import CreateNewFolderIcon from '@mui/icons-material/CreateNewFolder'
 
 import FileIcon from './FileIcon'
 import Breadcrumb from './Breadcrumb'
 import UploadDialog from './UploadDialog'
 import DeleteDialog from './DeleteDialog'
 import PreviewDialog from './PreviewDialog'
+import CreateFolderDialog from './CreateFolderDialog'
 import { browseBucket, downloadObjectUrl, previewParquetSchema, previewTextObject, searchObjects } from '../api'
 import type { ObjectEntry, ParquetSchemaPreviewResponse, TextPreviewResponse } from '../types/api'
 import { formatBytes, formatDate } from '../utils/format'
@@ -74,6 +76,7 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ providerId, bucketName, rea
   const [searchQuery, setSearchQuery] = useState('')
   const [searchActive, setSearchActive] = useState(false)
   const [uploadOpen, setUploadOpen] = useState(false)
+  const [createFolderOpen, setCreateFolderOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
   const [previewLoading, setPreviewLoading] = useState(false)
@@ -256,14 +259,24 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ providerId, bucketName, rea
 
           {/* Upload */}
           {!readOnlyAccess && (
-            <Button
-              variant="contained"
-              size="small"
-              startIcon={<UploadFileIcon />}
-              onClick={() => setUploadOpen(true)}
-            >
-              Upload
-            </Button>
+            <>
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<CreateNewFolderIcon />}
+                onClick={() => setCreateFolderOpen(true)}
+              >
+                New Folder
+              </Button>
+              <Button
+                variant="contained"
+                size="small"
+                startIcon={<UploadFileIcon />}
+                onClick={() => setUploadOpen(true)}
+              >
+                Upload
+              </Button>
+            </>
           )}
 
           {/* Delete selected */}
@@ -511,6 +524,15 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ providerId, bucketName, rea
         bucketName={bucketName}
         currentPath={path}
         onUploaded={() => loadDirectory(path)}
+      />
+
+      <CreateFolderDialog
+        open={createFolderOpen}
+        onClose={() => setCreateFolderOpen(false)}
+        providerId={providerId}
+        bucketName={bucketName}
+        currentPath={path}
+        onCreated={() => loadDirectory(path)}
       />
 
       <DeleteDialog

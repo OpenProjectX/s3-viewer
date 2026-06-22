@@ -30,6 +30,7 @@ All endpoints are under `/s3-viewer/api/v1`. The OpenAPI spec is at `autoconfigu
 | `GET` | `/s3-viewer/api/v1/providers/{id}/buckets/{name}/download` | Download an object (`?key=object/key`) |
 | `GET` | `/s3-viewer/api/v1/providers/{id}/buckets/{name}/preview/text` | Preview supported text objects (`?key=object/key&maxBytes=1048576`) |
 | `GET` | `/s3-viewer/api/v1/providers/{id}/buckets/{name}/preview/parquet/schema` | Preview parquet schema only (`?key=object/key`) |
+| `POST` | `/s3-viewer/api/v1/providers/{id}/buckets/{name}/folders` | Create a virtual folder (JSON body: `{"path": "prefix", "folderName": "name"}`) |
 | `POST` | `/s3-viewer/api/v1/providers/{id}/buckets/{name}/upload` | Upload a file (`multipart/form-data`, `?path=prefix`) |
 | `DELETE` | `/s3-viewer/api/v1/providers/{id}/buckets/{name}/objects` | Delete objects (JSON body: `{"keys": [...]}`) |
 | `GET` | `/s3-viewer/api/v1/providers/{id}/buckets/{name}/search` | Search objects by name (`?query=term&path=prefix&maxResults=100`) |
@@ -113,6 +114,7 @@ The `ui` module is a React + Vite + MUI single-page application. Features:
 - File-type icons (images, video, audio, code, archives, data files, etc.)
 - **Search** — live case-insensitive name search within a bucket/path
 - **Preview** — inline review for `.txt` and `.json` content, plus parquet schema without reading row data
+- **Create folder** — create virtual folders under the current bucket path
 - **Upload** — drag & drop or file picker with per-file progress bars
 - **Download** — direct download button per file
 - **Delete** — multi-select with confirmation dialog

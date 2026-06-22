@@ -113,6 +113,23 @@ class S3ViewerApiIntegrationTest : S3ViewerLocalStackIntegrationTest() {
             .jsonPath("$.truncated").isEqualTo(false)
             .jsonPath("$.content").isEqualTo("""{"enabled":true}""")
 
+        webTestClient.post()
+            .uri("/s3-viewer/api/v1/providers/test/buckets/test-bucket/folders")
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue("""{"path":"docs","folderName":"reports"}""")
+            .exchange()
+            .expectStatus().isCreated
+            .expectBody()
+            .jsonPath("$.name").isEqualTo("reports")
+            .jsonPath("$.key").isEqualTo("docs/reports")
+            .jsonPath("$.type").isEqualTo("DIRECTORY")
+
+        webTestClient.get().uri("/s3-viewer/api/v1/providers/test/buckets/test-bucket/browse?path=docs/")
+            .exchange()
+            .expectStatus().isOk
+            .expectBody()
+            .jsonPath("$.entries[?(@.name == 'reports')].type").isEqualTo("DIRECTORY")
+
         val content = "uploaded content".toByteArray()
         webTestClient.post()
             .uri("/s3-viewer/api/v1/providers/test/buckets/test-bucket/upload?path=uploads/")

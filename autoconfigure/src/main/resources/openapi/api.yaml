@@ -178,6 +178,31 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+  /s3-viewer/api/v1/providers/{providerId}/buckets/{bucketName}/folders:
+    post:
+      tags: [Viewer]
+      operationId: createFolder
+      summary: Create a virtual folder in a bucket path
+      parameters:
+        - $ref: "#/components/parameters/ProviderId"
+        - $ref: "#/components/parameters/BucketName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateFolderRequest"
+      responses:
+        "201":
+          description: Folder created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ObjectEntry"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /s3-viewer/api/v1/providers/{providerId}/buckets/{bucketName}/objects:
     delete:
       tags: [Viewer]
@@ -378,6 +403,16 @@ components:
           nullable: true
         schema:
           type: string
+    CreateFolderRequest:
+      type: object
+      required: [folderName]
+      properties:
+        path:
+          type: string
+          description: Parent directory path (prefix) in the bucket
+        folderName:
+          type: string
+          description: Folder name to create under the parent path
     DeleteRequest:
       type: object
       required: [keys]

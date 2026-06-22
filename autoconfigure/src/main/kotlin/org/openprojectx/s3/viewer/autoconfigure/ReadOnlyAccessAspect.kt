@@ -9,7 +9,8 @@ class ReadOnlyAccessAspect(
     private val properties: S3ViewerProperties
 ) {
     @Before(
-        "execution(* org.openprojectx.s3.viewer.core.S3ViewerService.uploadObject(..)) || " +
+        "execution(* org.openprojectx.s3.viewer.core.S3ViewerService.createFolder(..)) || " +
+            "execution(* org.openprojectx.s3.viewer.core.S3ViewerService.uploadObject(..)) || " +
             "execution(* org.openprojectx.s3.viewer.core.S3ViewerService.deleteObjects(..))"
     )
     fun rejectWriteOperationWhenReadOnly() {

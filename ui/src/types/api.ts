@@ -53,6 +53,11 @@ export interface ParquetSchemaPreviewResponse {
   schema: string
 }
 
+export interface CreateFolderRequest {
+  path?: string | null
+  folderName: string
+}
+
 export interface DeleteRequest {
   keys: string[]
 }

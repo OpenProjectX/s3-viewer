@@ -16,9 +16,11 @@ import org.apache.parquet.io.InputFile
 import org.apache.parquet.io.SeekableInputStream
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider
+import software.amazon.awssdk.core.sync.RequestBody
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.S3Client
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest
+import software.amazon.awssdk.services.s3.model.PutObjectRequest
 import software.amazon.nio.spi.s3.SpringAwareS3FileSystemProvider
 import java.io.ByteArrayOutputStream
 import java.io.EOFException
@@ -168,6 +170,45 @@ internal open class DefaultS3ViewerService(
         } catch (ex: Exception) {
             throw S3ViewerException("Failed to read parquet schema for object '$key'", ex)
         }
+    }
+
+    open override fun createFolder(
+        providerId: String,
+        bucketName: String,
+        path: String?,
+        folderName: String
+    ): BucketObjectEntry {
+        val provider = getProvider(providerId)
+        requireAllowedBucket(provider, bucketName)
+
+        val normalizedPath = normalizePath(path)
+        val normalizedFolderName = normalizeFolderName(folderName)
+        val key = listOf(normalizedPath, normalizedFolderName)
+            .filter { it.isNotBlank() }
+            .joinToString("/")
+
+        val fileSystem = fileSystem(provider, bucketName)
+        val targetPath = fileSystem.getPath("/${key.trimStart('/')}").normalize()
+        if (Files.exists(targetPath) && !Files.isDirectory(targetPath)) {
+            throw S3ViewerException("Object '$key' already exists and is not a folder")
+        }
+
+        s3Client(provider).use { s3 ->
+            s3.putObject(
+                PutObjectRequest.builder()
+                    .bucket(bucketName)
+                    .key("$key/")
+                    .contentType("application/x-directory")
+                    .build(),
+                RequestBody.empty()
+            )
+        }
+
+        return BucketObjectEntry(
+            name = normalizedFolderName,
+            key = key,
+            type = BucketObjectType.DIRECTORY
+        )
     }
 
     open override fun uploadObject(
@@ -369,6 +410,17 @@ internal open class DefaultS3ViewerService(
             ?.trim('/')
             .orEmpty()
 
+    private fun normalizeFolderName(folderName: String): String {
+        val normalized = folderName.trim().trim('/')
+        if (normalized.isBlank()) {
+            throw S3ViewerException("Folder name must not be blank")
+        }
+        if ('/' in normalized) {
+            throw S3ViewerException("Folder name must not contain '/'")
+        }
+        return normalized
+    }
+
     private fun parentPath(path: String): String? {
         if (path.isBlank()) {
             return null
@@ -395,27 +447,29 @@ internal open class DefaultS3ViewerService(
         key: String
     ): String? =
         try {
-            S3Client.builder()
-                .region(Region.of(provider.region))
-                .endpointOverride(URI.create(provider.endpoint))
-                .forcePathStyle(provider.pathStyleAccess)
-                .credentialsProvider(
-                    StaticCredentialsProvider.create(
-                        AwsBasicCredentials.create(provider.accessKey, provider.secretKey)
-                    )
-                )
-                .build()
-                .use { s3 ->
-                    s3.headObject(
-                        HeadObjectRequest.builder()
-                            .bucket(bucketName)
-                            .key(key)
-                            .build()
-                    ).contentType()?.takeIf { it.isNotBlank() }
-                }
+            s3Client(provider).use { s3 ->
+                s3.headObject(
+                    HeadObjectRequest.builder()
+                        .bucket(bucketName)
+                        .key(key)
+                        .build()
+                ).contentType()?.takeIf { it.isNotBlank() }
+            }
         } catch (_: Exception) {
             null
         }
+
+    private fun s3Client(provider: S3ViewerProperties.Provider): S3Client =
+        S3Client.builder()
+            .region(Region.of(provider.region))
+            .endpointOverride(URI.create(provider.endpoint))
+            .forcePathStyle(provider.pathStyleAccess)
+            .credentialsProvider(
+                StaticCredentialsProvider.create(
+                    AwsBasicCredentials.create(provider.accessKey, provider.secretKey)
+                )
+            )
+            .build()
 
     private fun isTextPreviewSupported(fileName: String, contentType: String): Boolean {
         val lowerName = fileName.lowercase()

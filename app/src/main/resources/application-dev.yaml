@@ -1,15 +1,15 @@
 spring:
   application:
     name: s3-viewer
-  webflux:
-    base-path: /dev/service
+#  webflux:
+#    base-path: /dev/service
 
 s3-viewer:
   read-only-access: false
   providers:
     - id: localstack
       name: LocalStack
-      endpoint: ${LOCALSTACK_ENDPOINT:http://localhost:4566}
+      endpoint: ${LOCALSTACK_ENDPOINT:http://localhost:32822}
       region: us-east-1
       access-key: test
       secret-key: test
@@ -17,6 +17,7 @@ s3-viewer:
       buckets:
         - demo-assets
         - demo-archive
+        - spark-iceberg-s3-315743701367333
     - id: rustfs
       name: rustfs
       endpoint: https://s3.cn-guangzhou-a.k8s.openprojectx.org
@@ -26,8 +27,8 @@ s3-viewer:
       path-style-access: true
       buckets:
         - data
-  ui:
-    api-base-path: /dev/service/s3-viewer/api
+#  ui:
+#    api-base-path: /dev/service/s3-viewer/api
 
 logging:
   level:

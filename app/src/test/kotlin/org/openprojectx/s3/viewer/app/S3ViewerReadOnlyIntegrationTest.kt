@@ -43,6 +43,18 @@ class S3ViewerReadOnlyIntegrationTest {
     }
 
     @Test
+    fun `create folder is forbidden when readonly access is enabled`() {
+        webTestClient.post()
+            .uri("/s3-viewer/api/v1/providers/test/buckets/test-bucket/folders")
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue("""{"folderName":"blocked"}""")
+            .exchange()
+            .expectStatus().isForbidden
+            .expectBody()
+            .jsonPath("$.message").isEqualTo("S3 Viewer is configured for read-only access")
+    }
+
+    @Test
     fun `delete is forbidden when readonly access is enabled`() {
         webTestClient.method(HttpMethod.DELETE)
             .uri("/s3-viewer/api/v1/providers/test/buckets/test-bucket/objects")

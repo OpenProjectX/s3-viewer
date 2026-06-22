@@ -2,6 +2,7 @@ import axios from 'axios'
 import type {
   BrowseResponse,
   BucketSummary,
+  CreateFolderRequest,
   DeleteRequest,
   ObjectEntry,
   ParquetSchemaPreviewResponse,
@@ -88,6 +89,20 @@ export async function previewParquetSchema(
   const { data } = await client.get<ParquetSchemaPreviewResponse>(
     `/providers/${providerId}/buckets/${bucketName}/preview/parquet/schema`,
     { params: { key } }
+  )
+  return data
+}
+
+export async function createFolder(
+  providerId: string,
+  bucketName: string,
+  path: string | undefined,
+  folderName: string
+): Promise<ObjectEntry> {
+  const body: CreateFolderRequest = { path, folderName }
+  const { data } = await client.post<ObjectEntry>(
+    `/providers/${providerId}/buckets/${bucketName}/folders`,
+    body
   )
   return data
 }

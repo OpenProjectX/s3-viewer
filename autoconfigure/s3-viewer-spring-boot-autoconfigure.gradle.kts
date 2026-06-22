@@ -66,7 +66,9 @@ dependencies {
     implementation("org.springdoc:springdoc-openapi-starter-webflux-ui:3.0.2")
     implementation("org.openapitools:jackson-databind-nullable:0.2.10")
     implementation(libs.awsJavaNioS3)
-    implementation("org.apache.parquet:parquet-hadoop:1.16.0")
+    implementation("org.apache.parquet:parquet-hadoop:1.17.1")
+    implementation("org.apache.hadoop:hadoop-client:3.3.0")
+    implementation("org.apache.hadoop:hadoop-common:3.3.0")
 
     implementation(platform("software.amazon.awssdk:bom:2.39.2"))
     implementation("software.amazon.awssdk:auth")

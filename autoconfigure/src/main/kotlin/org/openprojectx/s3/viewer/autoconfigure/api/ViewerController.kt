@@ -4,6 +4,7 @@ import jakarta.validation.Valid
 import jakarta.validation.constraints.NotNull
 import org.openprojectx.s3.viewer.autoconfigure.model.BrowseResponse
 import org.openprojectx.s3.viewer.autoconfigure.model.BucketSummary
+import org.openprojectx.s3.viewer.autoconfigure.model.CreateFolderRequest
 import org.openprojectx.s3.viewer.autoconfigure.model.DeleteRequest
 import org.openprojectx.s3.viewer.autoconfigure.model.ObjectEntry
 import org.openprojectx.s3.viewer.autoconfigure.model.ObjectEntryType
@@ -108,6 +109,22 @@ class ViewerController(
             ResponseEntity.ok(
                 s3ViewerService.previewParquetSchema(providerId, bucketName, key).toApiModel()
             )
+        }
+
+    override fun createFolder(
+        providerId: String,
+        bucketName: String,
+        createFolderRequest: Mono<CreateFolderRequest>,
+        exchange: ServerWebExchange
+    ): Mono<ResponseEntity<ObjectEntry>> =
+        createFolderRequest.map { request ->
+            val entry = s3ViewerService.createFolder(
+                providerId = providerId,
+                bucketName = bucketName,
+                path = request.path,
+                folderName = request.folderName
+            )
+            ResponseEntity.status(HttpStatus.CREATED).body(entry.toApiModel())
         }
 
     override fun uploadObject(
