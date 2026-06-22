@@ -1,0 +1,114 @@
+services:
+  s3-viewer:
+    image: ghcr.io/openprojectx/s3-viewer:latest
+    ports:
+      - "8081:8081"
+    environment:
+      S3_VIEWER_READ_ONLY_ACCESS: "false"
+
+      S3_VIEWER_PROVIDERS_0_ID: localstack
+      S3_VIEWER_PROVIDERS_0_NAME: LocalStack
+      S3_VIEWER_PROVIDERS_0_ENDPOINT: http://localstack:4566
+      S3_VIEWER_PROVIDERS_0_REGION: us-east-1
+      S3_VIEWER_PROVIDERS_0_ACCESS_KEY: test
+      S3_VIEWER_PROVIDERS_0_SECRET_KEY: test
+      S3_VIEWER_PROVIDERS_0_PATH_STYLE_ACCESS: "true"
+      S3_VIEWER_PROVIDERS_0_BUCKETS_0: demo-assets
+      S3_VIEWER_PROVIDERS_0_BUCKETS_1: demo-archive
+
+      S3_VIEWER_PROVIDERS_1_ID: ministack
+      S3_VIEWER_PROVIDERS_1_NAME: MiniStack
+      S3_VIEWER_PROVIDERS_1_ENDPOINT: http://ministack:4566
+      S3_VIEWER_PROVIDERS_1_REGION: us-east-1
+      S3_VIEWER_PROVIDERS_1_ACCESS_KEY: test
+      S3_VIEWER_PROVIDERS_1_SECRET_KEY: test
+      S3_VIEWER_PROVIDERS_1_PATH_STYLE_ACCESS: "true"
+      S3_VIEWER_PROVIDERS_1_BUCKETS_0: demo-assets
+      S3_VIEWER_PROVIDERS_1_BUCKETS_1: demo-archive
+
+      S3_VIEWER_PROVIDERS_2_ID: floci
+      S3_VIEWER_PROVIDERS_2_NAME: Floci
+      S3_VIEWER_PROVIDERS_2_ENDPOINT: http://floci:4566
+      S3_VIEWER_PROVIDERS_2_REGION: us-east-1
+      S3_VIEWER_PROVIDERS_2_ACCESS_KEY: test
+      S3_VIEWER_PROVIDERS_2_SECRET_KEY: test
+      S3_VIEWER_PROVIDERS_2_PATH_STYLE_ACCESS: "true"
+      S3_VIEWER_PROVIDERS_2_BUCKETS_0: demo-assets
+      S3_VIEWER_PROVIDERS_2_BUCKETS_1: demo-archive
+    depends_on:
+      localstack:
+        condition: service_healthy
+      ministack:
+        condition: service_started
+      floci:
+        condition: service_started
+
+  localstack:
+    image: ghcr.io/openprojectx/dockerhub/localstack/localstack:4.14.0
+    ports:
+      - "4566:4566"
+    environment:
+      SERVICES: s3
+      AWS_DEFAULT_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      http_proxy: ""
+      https_proxy: ""
+      HTTP_PROXY: ""
+      HTTPS_PROXY: ""
+      ALL_PROXY: ""
+      all_proxy: ""
+    volumes:
+      - ./.devcontainer/init-aws.sh:/etc/localstack/init/ready.d/init-aws.sh:ro
+      - localstack-data:/var/lib/localstack
+      - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test: ["CMD", "awslocal", "s3", "ls"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  ministack:
+    image: ministackorg/ministack
+    ports:
+      - "4567:4566"
+    environment:
+      MINISTACK_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      PERSIST_STATE: "1"
+      STATE_DIR: /data/ministack-state
+      S3_PERSIST: "1"
+      S3_DATA_DIR: /data/s3
+      REDIS_HOST: redis
+      DOCKER_NETWORK: ${COMPOSE_PROJECT_NAME:-s3-viewer}_default
+    volumes:
+      - ministack-data:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      redis:
+        condition: service_started
+
+  redis:
+    image: redis:7-alpine
+
+  floci:
+    image: floci/floci:latest
+    ports:
+      - "4568:4566"
+    environment:
+      AWS_DEFAULT_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      FLOCI_HOSTNAME: floci
+      FLOCI_STORAGE_MODE: persistent
+      FLOCI_STORAGE_PERSISTENT_PATH: /app/data
+    volumes:
+      - floci-data:/app/data
+      - /var/run/docker.sock:/var/run/docker.sock
+
+volumes:
+  localstack-data:
+  ministack-data:
+  floci-data:

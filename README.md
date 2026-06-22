@@ -148,6 +148,36 @@ docker run --rm -p 8081:8081 ghcr.io/openprojectx/s3-viewer:<version>
 
 The UI is available at `http://localhost:8081/s3-viewer/ui/`.
 
+For a local multi-provider playground, use the Compose example:
+
+```bash
+docker compose -f docker-compose.example.yml up
+```
+
+It starts S3 Viewer from `ghcr.io/openprojectx/s3-viewer:latest` and configures three local AWS/S3-compatible providers:
+
+| Provider | Image | Host endpoint |
+|---|---|---|
+| LocalStack | `ghcr.io/openprojectx/dockerhub/localstack/localstack:4.14.0` | `http://localhost:4566` |
+| MiniStack | `ministackorg/ministack` | `http://localhost:4567` |
+| Floci | `floci/floci:latest` | `http://localhost:4568` |
+
+Inside the Compose network, S3 Viewer talks to each provider on its service DNS name and port `4566`.
+
+The example config uses buckets named `demo-assets` and `demo-archive`. LocalStack creates them through the existing init script. For MiniStack and Floci, create them with the AWS CLI after startup if you want all three providers immediately browsable:
+
+```bash
+AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test AWS_DEFAULT_REGION=us-east-1 \
+  aws --endpoint-url=http://localhost:4567 s3 mb s3://demo-assets
+AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test AWS_DEFAULT_REGION=us-east-1 \
+  aws --endpoint-url=http://localhost:4567 s3 mb s3://demo-archive
+
+AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test AWS_DEFAULT_REGION=us-east-1 \
+  aws --endpoint-url=http://localhost:4568 s3 mb s3://demo-assets
+AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test AWS_DEFAULT_REGION=us-east-1 \
+  aws --endpoint-url=http://localhost:4568 s3 mb s3://demo-archive
+```
+
 For real S3 providers, mount a Spring Boot config file into `/config/application.yaml`:
 
 ```bash
