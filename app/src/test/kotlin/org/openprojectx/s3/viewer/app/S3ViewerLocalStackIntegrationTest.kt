@@ -29,7 +29,7 @@ abstract class S3ViewerLocalStackIntegrationTest {
         @JvmField
         val localstack: LocalStackContainer =
             LocalStackContainer(
-                DockerImageName.parse("docker.io/localstack/localstack:4")
+                DockerImageName.parse("ghcr.io/openprojectx/dockerhub/localstack/localstack:4")
                     .asCompatibleSubstituteFor("localstack/localstack")
             )
                 .withServices(S3)
