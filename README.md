@@ -158,7 +158,7 @@ It starts S3 Viewer from `ghcr.io/openprojectx/s3-viewer:latest` and configures 
 
 | Provider | Image | Host endpoint |
 |---|---|---|
-| LocalStack | `ghcr.io/openprojectx/dockerhub/localstack/localstack:4.14.0` | `http://localhost:4566` |
+| LocalStack | `ghcr.io/openprojectx/dockerhub/localstack/localstack:4` | `http://localhost:4566` |
 | MiniStack | `ministackorg/ministack` | `http://localhost:4567` |
 | Floci | `floci/floci:latest` | `http://localhost:4568` |
 

@@ -35,6 +35,10 @@ services:
       S3_VIEWER_PROVIDERS_2_PATH_STYLE_ACCESS: "true"
       S3_VIEWER_PROVIDERS_2_BUCKETS_0: demo-assets
       S3_VIEWER_PROVIDERS_2_BUCKETS_1: demo-archive
+      http_proxy: ""
+      https_proxy: ""
+      HTTP_PROXY: ""
+      HTTPS_PROXY: ""
     depends_on:
       localstack:
         condition: service_healthy
@@ -44,7 +48,7 @@ services:
         condition: service_started
 
   localstack:
-    image: ghcr.io/openprojectx/dockerhub/localstack/localstack:4.14.0
+    image: ghcr.io/openprojectx/dockerhub/localstack/localstack:4
     ports:
       - "4566:4566"
     environment:
@@ -83,6 +87,10 @@ services:
       S3_DATA_DIR: /data/s3
       REDIS_HOST: redis
       DOCKER_NETWORK: ${COMPOSE_PROJECT_NAME:-s3-viewer}_default
+      http_proxy: ""
+      https_proxy: ""
+      HTTP_PROXY: ""
+      HTTPS_PROXY: ""
     volumes:
       - ministack-data:/data
       - /var/run/docker.sock:/var/run/docker.sock
@@ -104,6 +112,10 @@ services:
       FLOCI_HOSTNAME: floci
       FLOCI_STORAGE_MODE: persistent
       FLOCI_STORAGE_PERSISTENT_PATH: /app/data
+      http_proxy: ""
+      https_proxy: ""
+      HTTP_PROXY: ""
+      HTTPS_PROXY: ""
     volumes:
       - floci-data:/app/data
       - /var/run/docker.sock:/var/run/docker.sock
