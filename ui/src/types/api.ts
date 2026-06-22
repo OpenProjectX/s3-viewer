@@ -37,6 +37,22 @@ export interface ObjectEntry {
   lastModified?: string | null
 }
 
+export interface TextPreviewResponse {
+  key: string
+  fileName: string
+  contentType: string
+  size?: number | null
+  truncated: boolean
+  content: string
+}
+
+export interface ParquetSchemaPreviewResponse {
+  key: string
+  fileName: string
+  size?: number | null
+  schema: string
+}
+
 export interface DeleteRequest {
   keys: string[]
 }

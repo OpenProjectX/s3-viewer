@@ -87,6 +87,60 @@ paths:
                 format: binary
         "404":
           $ref: "#/components/responses/NotFound"
+  /s3-viewer/api/v1/providers/{providerId}/buckets/{bucketName}/preview/text:
+    get:
+      tags: [Viewer]
+      operationId: previewTextObject
+      summary: Preview a text-like object
+      parameters:
+        - $ref: "#/components/parameters/ProviderId"
+        - $ref: "#/components/parameters/BucketName"
+        - name: key
+          in: query
+          required: true
+          description: Object key to preview
+          schema:
+            type: string
+        - name: maxBytes
+          in: query
+          required: false
+          description: Maximum bytes to read for preview (default 1048576)
+          schema:
+            type: integer
+            format: int64
+            default: 1048576
+      responses:
+        "200":
+          description: Text preview returned successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TextPreviewResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /s3-viewer/api/v1/providers/{providerId}/buckets/{bucketName}/preview/parquet/schema:
+    get:
+      tags: [Viewer]
+      operationId: previewParquetSchema
+      summary: Preview parquet schema without returning row data
+      parameters:
+        - $ref: "#/components/parameters/ProviderId"
+        - $ref: "#/components/parameters/BucketName"
+        - name: key
+          in: query
+          required: true
+          description: Parquet object key to inspect
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Parquet schema returned successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ParquetSchemaPreviewResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /s3-viewer/api/v1/providers/{providerId}/buckets/{bucketName}/upload:
     post:
       tags: [Viewer]
@@ -292,6 +346,38 @@ components:
     ObjectEntryType:
       type: string
       enum: [DIRECTORY, FILE]
+    TextPreviewResponse:
+      type: object
+      required: [key, fileName, contentType, truncated, content]
+      properties:
+        key:
+          type: string
+        fileName:
+          type: string
+        contentType:
+          type: string
+        size:
+          type: integer
+          format: int64
+          nullable: true
+        truncated:
+          type: boolean
+        content:
+          type: string
+    ParquetSchemaPreviewResponse:
+      type: object
+      required: [key, fileName, schema]
+      properties:
+        key:
+          type: string
+        fileName:
+          type: string
+        size:
+          type: integer
+          format: int64
+          nullable: true
+        schema:
+          type: string
     DeleteRequest:
       type: object
       required: [keys]

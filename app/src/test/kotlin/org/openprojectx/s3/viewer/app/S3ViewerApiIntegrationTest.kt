@@ -32,6 +32,14 @@ class S3ViewerApiIntegrationTest : S3ViewerLocalStackIntegrationTest() {
                 RequestBody.fromString("Hello S3 Viewer")
             )
             s3.putObject(
+                PutObjectRequest.builder()
+                    .bucket("test-bucket")
+                    .key("docs/config.json")
+                    .contentType("application/octet-stream")
+                    .build(),
+                RequestBody.fromString("""{"enabled":true}""")
+            )
+            s3.putObject(
                 PutObjectRequest.builder().bucket("test-bucket").key("images/photo.jpg").build(),
                 RequestBody.fromBytes(ByteArray(128))
             )
@@ -75,6 +83,7 @@ class S3ViewerApiIntegrationTest : S3ViewerLocalStackIntegrationTest() {
             .expectStatus().isOk
             .expectBody()
             .jsonPath("$.entries[?(@.name == 'readme.txt')].type").isEqualTo("FILE")
+            .jsonPath("$.entries[?(@.name == 'config.json')].type").isEqualTo("FILE")
 
         webTestClient.get()
             .uri("/s3-viewer/api/v1/providers/test/buckets/test-bucket/download?key=docs/readme.txt")
@@ -82,6 +91,27 @@ class S3ViewerApiIntegrationTest : S3ViewerLocalStackIntegrationTest() {
             .expectStatus().isOk
             .expectHeader().valueMatches("Content-Disposition", ".*readme\\.txt.*")
             .expectBody(String::class.java).isEqualTo("Hello S3 Viewer")
+
+        webTestClient.get()
+            .uri("/s3-viewer/api/v1/providers/test/buckets/test-bucket/preview/text?key=docs/readme.txt")
+            .exchange()
+            .expectStatus().isOk
+            .expectBody()
+            .jsonPath("$.key").isEqualTo("docs/readme.txt")
+            .jsonPath("$.fileName").isEqualTo("readme.txt")
+            .jsonPath("$.contentType").value<String> { assertEquals(true, it.startsWith("text/plain")) }
+            .jsonPath("$.truncated").isEqualTo(false)
+            .jsonPath("$.content").isEqualTo("Hello S3 Viewer")
+
+        webTestClient.get()
+            .uri("/s3-viewer/api/v1/providers/test/buckets/test-bucket/preview/text?key=docs/config.json")
+            .exchange()
+            .expectStatus().isOk
+            .expectBody()
+            .jsonPath("$.fileName").isEqualTo("config.json")
+            .jsonPath("$.contentType").isEqualTo("application/octet-stream")
+            .jsonPath("$.truncated").isEqualTo(false)
+            .jsonPath("$.content").isEqualTo("""{"enabled":true}""")
 
         val content = "uploaded content".toByteArray()
         webTestClient.post()

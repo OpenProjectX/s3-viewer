@@ -4,20 +4,34 @@ import org.openprojectx.s3.viewer.core.BucketBrowseResult
 import org.openprojectx.s3.viewer.core.BucketObjectEntry
 import org.openprojectx.s3.viewer.core.BucketObjectType
 import org.openprojectx.s3.viewer.core.ObjectDownload
+import org.openprojectx.s3.viewer.core.ParquetSchemaPreview
 import org.openprojectx.s3.viewer.core.S3ViewerException
 import org.openprojectx.s3.viewer.core.S3ViewerService
 import org.openprojectx.s3.viewer.core.SearchResult
+import org.openprojectx.s3.viewer.core.TextObjectPreview
 import org.openprojectx.s3.viewer.core.ViewerBucket
 import org.openprojectx.s3.viewer.core.ViewerProvider
+import org.apache.parquet.hadoop.ParquetFileReader
+import org.apache.parquet.io.InputFile
+import org.apache.parquet.io.SeekableInputStream
+import software.amazon.awssdk.auth.credentials.AwsBasicCredentials
+import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider
+import software.amazon.awssdk.regions.Region
+import software.amazon.awssdk.services.s3.S3Client
+import software.amazon.awssdk.services.s3.model.HeadObjectRequest
 import software.amazon.nio.spi.s3.SpringAwareS3FileSystemProvider
+import java.io.ByteArrayOutputStream
+import java.io.EOFException
 import java.io.InputStream
 import java.net.URI
 import java.net.URLConnection
+import java.nio.ByteBuffer
 import java.nio.file.FileSystem
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.nio.file.attribute.BasicFileAttributes
+import java.nio.file.StandardOpenOption
 import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.io.path.invariantSeparatorsPathString
@@ -78,17 +92,10 @@ internal open class DefaultS3ViewerService(
     override fun downloadObject(providerId: String, bucketName: String, key: String): ObjectDownload {
         val provider = getProvider(providerId)
         requireAllowedBucket(provider, bucketName)
-
-        val fileSystem = fileSystem(provider, bucketName)
-        val path = fileSystem.getPath("/${key.trimStart('/')}").normalize()
-
-        if (!Files.exists(path) || Files.isDirectory(path)) {
-            throw S3ViewerException("Object '$key' was not found in bucket '$bucketName'")
-        }
-
+        val path = resolveObjectPath(provider, bucketName, key)
         val attributes = Files.readAttributes(path, BasicFileAttributes::class.java)
         val fileName = path.name.ifBlank { key }
-        val contentType = URLConnection.guessContentTypeFromName(fileName) ?: "application/octet-stream"
+        val contentType = detectContentType(provider, bucketName, key, path, fileName)
 
         return ObjectDownload(
             fileName = fileName,
@@ -96,6 +103,71 @@ internal open class DefaultS3ViewerService(
             size = attributes.size(),
             inputStream = Files.newInputStream(path)
         )
+    }
+
+    override fun previewTextObject(providerId: String, bucketName: String, key: String, maxBytes: Long): TextObjectPreview {
+        val provider = getProvider(providerId)
+        requireAllowedBucket(provider, bucketName)
+        val path = resolveObjectPath(provider, bucketName, key)
+        val attributes = Files.readAttributes(path, BasicFileAttributes::class.java)
+        val fileName = path.name.ifBlank { key }
+        val contentType = detectContentType(provider, bucketName, key, path, fileName)
+
+        if (!isTextPreviewSupported(fileName, contentType)) {
+            throw S3ViewerException("Object '$key' is not a supported text preview type")
+        }
+
+        val previewLimit = maxBytes.coerceIn(1, MAX_TEXT_PREVIEW_BYTES)
+        val buffer = ByteArrayOutputStream()
+        Files.newInputStream(path).use { input ->
+            val chunk = ByteArray(DEFAULT_BUFFER_SIZE)
+            var remaining = previewLimit
+            while (remaining > 0) {
+                val read = input.read(chunk, 0, minOf(chunk.size.toLong(), remaining).toInt())
+                if (read < 0) {
+                    break
+                }
+                buffer.write(chunk, 0, read)
+                remaining -= read
+            }
+        }
+
+        return TextObjectPreview(
+            key = key,
+            fileName = fileName,
+            contentType = contentType,
+            size = attributes.size(),
+            truncated = attributes.size() > previewLimit,
+            content = buffer.toByteArray().toString(Charsets.UTF_8)
+        )
+    }
+
+    override fun previewParquetSchema(providerId: String, bucketName: String, key: String): ParquetSchemaPreview {
+        val provider = getProvider(providerId)
+        requireAllowedBucket(provider, bucketName)
+        val path = resolveObjectPath(provider, bucketName, key)
+        val attributes = Files.readAttributes(path, BasicFileAttributes::class.java)
+        val fileName = path.name.ifBlank { key }
+        val contentType = detectContentType(provider, bucketName, key, path, fileName)
+
+        if (!isParquetPreviewSupported(fileName, contentType)) {
+            throw S3ViewerException("Object '$key' is not a supported parquet preview type")
+        }
+
+        try {
+            val inputFile = SeekablePathInputFile(path, attributes.size())
+            val schema = ParquetFileReader.open(inputFile).use { reader ->
+                reader.footer.fileMetaData.schema.toString()
+            }
+            return ParquetSchemaPreview(
+                key = key,
+                fileName = fileName,
+                size = attributes.size(),
+                schema = schema
+            )
+        } catch (ex: Exception) {
+            throw S3ViewerException("Failed to read parquet schema for object '$key'", ex)
+        }
     }
 
     open override fun uploadObject(
@@ -204,6 +276,17 @@ internal open class DefaultS3ViewerService(
         }
     }
 
+    private fun resolveObjectPath(provider: S3ViewerProperties.Provider, bucketName: String, key: String): Path {
+        val fileSystem = fileSystem(provider, bucketName)
+        val path = fileSystem.getPath("/${key.trimStart('/')}").normalize()
+
+        if (!Files.exists(path) || Files.isDirectory(path)) {
+            throw S3ViewerException("Object '$key' was not found in bucket '$bucketName'")
+        }
+
+        return path
+    }
+
     private fun resolveDirectory(
         provider: S3ViewerProperties.Provider,
         bucketName: String,
@@ -292,5 +375,135 @@ internal open class DefaultS3ViewerService(
         }
         return path.substringBeforeLast('/', "")
             .ifBlank { null }
+    }
+
+    private fun detectContentType(
+        provider: S3ViewerProperties.Provider,
+        bucketName: String,
+        key: String,
+        path: Path,
+        fileName: String
+    ): String =
+        s3MetadataContentType(provider, bucketName, key)
+            ?: Files.probeContentType(path)
+            ?: URLConnection.guessContentTypeFromName(fileName)
+            ?: "application/octet-stream"
+
+    private fun s3MetadataContentType(
+        provider: S3ViewerProperties.Provider,
+        bucketName: String,
+        key: String
+    ): String? =
+        try {
+            S3Client.builder()
+                .region(Region.of(provider.region))
+                .endpointOverride(URI.create(provider.endpoint))
+                .forcePathStyle(provider.pathStyleAccess)
+                .credentialsProvider(
+                    StaticCredentialsProvider.create(
+                        AwsBasicCredentials.create(provider.accessKey, provider.secretKey)
+                    )
+                )
+                .build()
+                .use { s3 ->
+                    s3.headObject(
+                        HeadObjectRequest.builder()
+                            .bucket(bucketName)
+                            .key(key)
+                            .build()
+                    ).contentType()?.takeIf { it.isNotBlank() }
+                }
+        } catch (_: Exception) {
+            null
+        }
+
+    private fun isTextPreviewSupported(fileName: String, contentType: String): Boolean {
+        val lowerName = fileName.lowercase()
+        val lowerContentType = contentType.lowercase()
+        return lowerContentType.startsWith("text/") ||
+                lowerContentType in TEXT_PREVIEW_CONTENT_TYPES ||
+                lowerName.endsWith(".txt") ||
+                lowerName.endsWith(".json")
+    }
+
+    private fun isParquetPreviewSupported(fileName: String, contentType: String): Boolean {
+        val lowerName = fileName.lowercase()
+        val lowerContentType = contentType.lowercase()
+        return lowerName.endsWith(".parquet") || lowerContentType in PARQUET_CONTENT_TYPES
+    }
+
+    companion object {
+        private const val MAX_TEXT_PREVIEW_BYTES = 1024 * 1024L
+
+        private val TEXT_PREVIEW_CONTENT_TYPES = setOf(
+            "application/json",
+            "application/x-ndjson",
+            "application/jsonlines",
+            "application/xml",
+            "application/yaml",
+            "application/x-yaml"
+        )
+
+        private val PARQUET_CONTENT_TYPES = setOf(
+            "application/vnd.apache.parquet",
+            "application/x-parquet"
+        )
+    }
+}
+
+private class SeekablePathInputFile(
+    private val path: Path,
+    private val length: Long
+) : InputFile {
+    override fun getLength(): Long = length
+
+    override fun newStream(): SeekableInputStream =
+        SeekablePathInputStream(path)
+}
+
+private class SeekablePathInputStream(path: Path) : SeekableInputStream() {
+    private val channel = Files.newByteChannel(path, StandardOpenOption.READ)
+
+    override fun getPos(): Long = channel.position()
+
+    override fun seek(newPos: Long) {
+        channel.position(newPos)
+    }
+
+    override fun read(): Int {
+        val buffer = ByteBuffer.allocate(1)
+        val read = channel.read(buffer)
+        if (read < 0) {
+            return -1
+        }
+        buffer.flip()
+        return buffer.get().toInt() and 0xff
+    }
+
+    override fun read(bytes: ByteArray, offset: Int, length: Int): Int =
+        channel.read(ByteBuffer.wrap(bytes, offset, length))
+
+    override fun read(buffer: ByteBuffer): Int =
+        channel.read(buffer)
+
+    override fun readFully(bytes: ByteArray) {
+        readFully(bytes, 0, bytes.size)
+    }
+
+    override fun readFully(bytes: ByteArray, start: Int, len: Int) {
+        val buffer = ByteBuffer.wrap(bytes, start, len)
+        readFully(buffer)
+    }
+
+    override fun readFully(buffer: ByteBuffer) {
+        while (buffer.hasRemaining()) {
+            if (channel.read(buffer) < 0) {
+                throw EOFException("Reached end of file before filling buffer")
+            }
+        }
+    }
+
+    override fun close() {
+        channel.close()
     }
 }

@@ -28,14 +28,16 @@ All endpoints are under `/s3-viewer/api/v1`. The OpenAPI spec is at `autoconfigu
 | `GET` | `/s3-viewer/api/v1/providers/{id}/buckets` | List buckets for a provider |
 | `GET` | `/s3-viewer/api/v1/providers/{id}/buckets/{name}/browse` | Browse objects at a path (`?path=prefix`) |
 | `GET` | `/s3-viewer/api/v1/providers/{id}/buckets/{name}/download` | Download an object (`?key=object/key`) |
+| `GET` | `/s3-viewer/api/v1/providers/{id}/buckets/{name}/preview/text` | Preview supported text objects (`?key=object/key&maxBytes=1048576`) |
+| `GET` | `/s3-viewer/api/v1/providers/{id}/buckets/{name}/preview/parquet/schema` | Preview parquet schema only (`?key=object/key`) |
 | `POST` | `/s3-viewer/api/v1/providers/{id}/buckets/{name}/upload` | Upload a file (`multipart/form-data`, `?path=prefix`) |
 | `DELETE` | `/s3-viewer/api/v1/providers/{id}/buckets/{name}/objects` | Delete objects (JSON body: `{"keys": [...]}`) |
 | `GET` | `/s3-viewer/api/v1/providers/{id}/buckets/{name}/search` | Search objects by name (`?query=term&path=prefix&maxResults=100`) |
 
 ### Breaking changes from 0.1.x
 
-- `S3ViewerService` interface has **four new methods**: `downloadObject`, `uploadObject`, `deleteObjects`, `searchObjects`. Any custom implementation must implement these.
-- `ObjectDownload` and `SearchResult` are new domain types added to the `core` module.
+- `S3ViewerService` interface has new object operation methods: `downloadObject`, `previewTextObject`, `previewParquetSchema`, `uploadObject`, `deleteObjects`, `searchObjects`. Any custom implementation must implement these.
+- `ObjectDownload`, `TextObjectPreview`, `ParquetSchemaPreview`, and `SearchResult` are domain types added to the `core` module.
 
 ## Configuration
 
@@ -110,9 +112,12 @@ The `ui` module is a React + Vite + MUI single-page application. Features:
 - Breadcrumb path navigation
 - File-type icons (images, video, audio, code, archives, data files, etc.)
 - **Search** — live case-insensitive name search within a bucket/path
+- **Preview** — inline review for `.txt` and `.json` content, plus parquet schema without reading row data
 - **Upload** — drag & drop or file picker with per-file progress bars
 - **Download** — direct download button per file
 - **Delete** — multi-select with confirmation dialog
+
+Preview content type is read from S3 object metadata first. Because S3 `Content-Type` is user-supplied and can be missing or wrong, the backend falls back to JVM content probing and filename extensions for supported preview types.
 
 When `s3-viewer.read-only-access=true`, write controls are hidden and the backend still rejects upload/delete requests with `403`.
 

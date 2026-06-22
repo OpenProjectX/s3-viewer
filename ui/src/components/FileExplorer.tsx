@@ -33,13 +33,15 @@ import GridViewIcon from '@mui/icons-material/GridView'
 import ViewListIcon from '@mui/icons-material/ViewList'
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward'
 import DownloadIcon from '@mui/icons-material/Download'
+import VisibilityIcon from '@mui/icons-material/Visibility'
 
 import FileIcon from './FileIcon'
 import Breadcrumb from './Breadcrumb'
 import UploadDialog from './UploadDialog'
 import DeleteDialog from './DeleteDialog'
-import { browseBucket, downloadObjectUrl, searchObjects } from '../api'
-import type { ObjectEntry } from '../types/api'
+import PreviewDialog from './PreviewDialog'
+import { browseBucket, downloadObjectUrl, previewParquetSchema, previewTextObject, searchObjects } from '../api'
+import type { ObjectEntry, ParquetSchemaPreviewResponse, TextPreviewResponse } from '../types/api'
 import { formatBytes, formatDate } from '../utils/format'
 
 interface FileExplorerProps {
@@ -49,6 +51,17 @@ interface FileExplorerProps {
 }
 
 type ViewMode = 'list' | 'grid'
+type PreviewData =
+  | { kind: 'text'; value: TextPreviewResponse }
+  | { kind: 'parquet'; value: ParquetSchemaPreviewResponse }
+
+function previewKind(entry: ObjectEntry): 'text' | 'parquet' | null {
+  if (entry.type !== 'FILE') return null
+  const name = entry.name.toLowerCase()
+  if (name.endsWith('.parquet')) return 'parquet'
+  if (name.endsWith('.txt') || name.endsWith('.json')) return 'text'
+  return null
+}
 
 const FileExplorer: React.FC<FileExplorerProps> = ({ providerId, bucketName, readOnlyAccess = false }) => {
   const [path, setPath] = useState('')
@@ -62,6 +75,10 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ providerId, bucketName, rea
   const [searchActive, setSearchActive] = useState(false)
   const [uploadOpen, setUploadOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const [previewOpen, setPreviewOpen] = useState(false)
+  const [previewLoading, setPreviewLoading] = useState(false)
+  const [previewError, setPreviewError] = useState<string | null>(null)
+  const [previewData, setPreviewData] = useState<PreviewData | null>(null)
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const loadDirectory = useCallback(
@@ -151,6 +168,29 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ providerId, bucketName, rea
     a.href = url
     a.download = entry.name
     a.click()
+  }
+
+  const handlePreview = async (entry: ObjectEntry) => {
+    const kind = previewKind(entry)
+    if (!kind) return
+
+    setPreviewOpen(true)
+    setPreviewLoading(true)
+    setPreviewError(null)
+    setPreviewData(null)
+    try {
+      if (kind === 'parquet') {
+        const result = await previewParquetSchema(providerId, bucketName, entry.key)
+        setPreviewData({ kind, value: result })
+      } else {
+        const result = await previewTextObject(providerId, bucketName, entry.key)
+        setPreviewData({ kind, value: result })
+      }
+    } catch (err: any) {
+      setPreviewError(err?.response?.data?.message ?? 'Preview failed')
+    } finally {
+      setPreviewLoading(false)
+    }
   }
 
   const selectedKeys = Array.from(selected)
@@ -351,11 +391,20 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ providerId, bucketName, rea
                   </TableCell>
                   <TableCell align="center">
                     {entry.type === 'FILE' && (
-                      <Tooltip title="Download">
-                        <IconButton size="small" onClick={() => handleDownload(entry)}>
-                          <DownloadIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
+                      <>
+                        {previewKind(entry) && (
+                          <Tooltip title="Preview">
+                            <IconButton size="small" onClick={() => handlePreview(entry)}>
+                              <VisibilityIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                        <Tooltip title="Download">
+                          <IconButton size="small" onClick={() => handleDownload(entry)}>
+                            <DownloadIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </>
                     )}
                   </TableCell>
                 </TableRow>
@@ -405,7 +454,7 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ providerId, bucketName, rea
                         toggleSelect(entry.key)
                       }
                     }}
-                    sx={{ p: 1.5, textAlign: 'center' }}
+                    sx={{ p: 1.5, pb: entry.type === 'FILE' ? 0.5 : 1.5, textAlign: 'center' }}
                   >
                     <FileIcon
                       name={entry.name}
@@ -431,6 +480,22 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ providerId, bucketName, rea
                       )}
                     </CardContent>
                   </CardActionArea>
+                  {entry.type === 'FILE' && (
+                    <Box sx={{ display: 'flex', justifyContent: 'center', gap: 0.5, px: 1, pb: 1 }}>
+                      {previewKind(entry) && (
+                        <Tooltip title="Preview">
+                          <IconButton size="small" onClick={() => handlePreview(entry)}>
+                            <VisibilityIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      )}
+                      <Tooltip title="Download">
+                        <IconButton size="small" onClick={() => handleDownload(entry)}>
+                          <DownloadIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </Box>
+                  )}
                 </Card>
               </Grid>
             ))}
@@ -458,6 +523,14 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ providerId, bucketName, rea
           setSelected(new Set())
           loadDirectory(path)
         }}
+      />
+
+      <PreviewDialog
+        open={previewOpen}
+        loading={previewLoading}
+        error={previewError}
+        data={previewData}
+        onClose={() => setPreviewOpen(false)}
       />
     </Box>
   )

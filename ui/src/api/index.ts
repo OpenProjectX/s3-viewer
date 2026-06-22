@@ -4,8 +4,10 @@ import type {
   BucketSummary,
   DeleteRequest,
   ObjectEntry,
+  ParquetSchemaPreviewResponse,
   ProviderSummary,
   SearchResponse,
+  TextPreviewResponse,
 } from '../types/api'
 
 declare global {
@@ -64,6 +66,30 @@ export function downloadObjectUrl(
   key: string
 ): string {
   return `${apiBase}/providers/${providerId}/buckets/${bucketName}/download?key=${encodeURIComponent(key)}`
+}
+
+export async function previewTextObject(
+  providerId: string,
+  bucketName: string,
+  key: string
+): Promise<TextPreviewResponse> {
+  const { data } = await client.get<TextPreviewResponse>(
+    `/providers/${providerId}/buckets/${bucketName}/preview/text`,
+    { params: { key } }
+  )
+  return data
+}
+
+export async function previewParquetSchema(
+  providerId: string,
+  bucketName: string,
+  key: string
+): Promise<ParquetSchemaPreviewResponse> {
+  const { data } = await client.get<ParquetSchemaPreviewResponse>(
+    `/providers/${providerId}/buckets/${bucketName}/preview/parquet/schema`,
+    { params: { key } }
+  )
+  return data
 }
 
 export async function uploadObject(

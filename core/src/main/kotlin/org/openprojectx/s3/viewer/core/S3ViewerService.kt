@@ -12,6 +12,10 @@ interface S3ViewerService {
 
     fun downloadObject(providerId: String, bucketName: String, key: String): ObjectDownload
 
+    fun previewTextObject(providerId: String, bucketName: String, key: String, maxBytes: Long): TextObjectPreview
+
+    fun previewParquetSchema(providerId: String, bucketName: String, key: String): ParquetSchemaPreview
+
     fun uploadObject(providerId: String, bucketName: String, path: String?, fileName: String, inputStream: InputStream): BucketObjectEntry
 
     fun deleteObjects(providerId: String, bucketName: String, keys: List<String>)
@@ -61,6 +65,22 @@ data class ObjectDownload(
     val contentType: String,
     val size: Long?,
     val inputStream: InputStream
+)
+
+data class TextObjectPreview(
+    val key: String,
+    val fileName: String,
+    val contentType: String,
+    val size: Long?,
+    val truncated: Boolean,
+    val content: String
+)
+
+data class ParquetSchemaPreview(
+    val key: String,
+    val fileName: String,
+    val size: Long?,
+    val schema: String
 )
 
 data class SearchResult(
