@@ -10,65 +10,12 @@ import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.TestInstance
-import org.springframework.boot.test.context.SpringBootTest
-import org.springframework.boot.test.context.SpringBootTest.WebEnvironment.RANDOM_PORT
 import org.springframework.boot.test.web.server.LocalServerPort
-import org.springframework.test.context.ActiveProfiles
-import org.springframework.test.context.DynamicPropertyRegistry
-import org.springframework.test.context.DynamicPropertySource
-import org.testcontainers.containers.localstack.LocalStackContainer
-import org.testcontainers.containers.localstack.LocalStackContainer.Service.S3
-import org.testcontainers.junit.jupiter.Container
-import org.testcontainers.junit.jupiter.Testcontainers
-import org.testcontainers.utility.DockerImageName
-import software.amazon.awssdk.auth.credentials.AwsBasicCredentials
-import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider
 import software.amazon.awssdk.core.sync.RequestBody
-import software.amazon.awssdk.regions.Region
-import software.amazon.awssdk.services.s3.S3Client
-import software.amazon.awssdk.services.s3.model.CreateBucketRequest
 import software.amazon.awssdk.services.s3.model.PutObjectRequest
 
 @Tag("e2e")
-@SpringBootTest(webEnvironment = RANDOM_PORT)
-@Testcontainers
-@ActiveProfiles("test")
-@TestInstance(TestInstance.Lifecycle.PER_CLASS)
-class S3ViewerE2ETest {
-
-    companion object {
-        @Container
-        @JvmField
-        val localstack: LocalStackContainer =
-            LocalStackContainer(
-                DockerImageName.parse("docker.io/localstack/localstack:4")
-                    .asCompatibleSubstituteFor("localstack/localstack")
-            )
-                .withServices(S3)
-
-        @JvmStatic
-        @DynamicPropertySource
-        fun configureProperties(registry: DynamicPropertyRegistry) {
-            registry.add("s3-viewer.providers[0].id") { "test" }
-            registry.add("s3-viewer.providers[0].name") { "Test LocalStack" }
-            registry.add("s3-viewer.providers[0].region") { "us-east-1" }
-            registry.add("s3-viewer.providers[0].access-key") { "test" }
-            registry.add("s3-viewer.providers[0].secret-key") { "test" }
-            registry.add("s3-viewer.providers[0].path-style-access") { true }
-            registry.add("s3-viewer.providers[0].buckets[0]") { "test-bucket" }
-            registry.add("s3-viewer.providers[0].endpoint") {
-                ensureLocalstackStarted()
-                localstack.getEndpointOverride(S3).toString()
-            }
-        }
-
-        private fun ensureLocalstackStarted() {
-            if (!localstack.isRunning) {
-                localstack.start()
-            }
-        }
-    }
+class S3ViewerE2ETest : S3ViewerLocalStackIntegrationTest() {
 
     @LocalServerPort
     var port: Int = 0
@@ -79,23 +26,17 @@ class S3ViewerE2ETest {
 
     @BeforeAll
     fun seedData() {
-        ensureLocalstackStarted()
-        val s3 = S3Client.builder()
-            .endpointOverride(localstack.getEndpointOverride(S3))
-            .credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create("test", "test")))
-            .region(Region.US_EAST_1)
-            .forcePathStyle(true)
-            .build()
-
-        s3.createBucket(CreateBucketRequest.builder().bucket("test-bucket").build())
-        s3.putObject(
-            PutObjectRequest.builder().bucket("test-bucket").key("readme.txt").build(),
-            RequestBody.fromString("Hello from E2E")
-        )
-        s3.putObject(
-            PutObjectRequest.builder().bucket("test-bucket").key("images/photo.jpg").build(),
-            RequestBody.fromBytes(ByteArray(64))
-        )
+        s3Client().use { s3 ->
+            ensureTestBucketExists(s3)
+            s3.putObject(
+                PutObjectRequest.builder().bucket("test-bucket").key("readme.txt").build(),
+                RequestBody.fromString("Hello from E2E")
+            )
+            s3.putObject(
+                PutObjectRequest.builder().bucket("test-bucket").key("images/photo.jpg").build(),
+                RequestBody.fromBytes(ByteArray(64))
+            )
+        }
     }
 
     @BeforeEach

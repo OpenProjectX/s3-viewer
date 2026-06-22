@@ -4,69 +4,16 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.TestInstance
-import org.springframework.boot.test.context.SpringBootTest
-import org.springframework.boot.test.context.SpringBootTest.WebEnvironment.RANDOM_PORT
 import org.springframework.boot.test.web.server.LocalServerPort
 import org.springframework.http.HttpMethod
 import org.springframework.http.MediaType
-import org.springframework.test.context.ActiveProfiles
-import org.springframework.test.context.DynamicPropertyRegistry
-import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.web.reactive.server.WebTestClient
-import org.testcontainers.containers.localstack.LocalStackContainer
-import org.testcontainers.containers.localstack.LocalStackContainer.Service.S3
-import org.testcontainers.junit.jupiter.Container
-import org.testcontainers.junit.jupiter.Testcontainers
-import org.testcontainers.utility.DockerImageName
-import software.amazon.awssdk.auth.credentials.AwsBasicCredentials
-import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider
 import software.amazon.awssdk.core.sync.RequestBody
-import software.amazon.awssdk.regions.Region
-import software.amazon.awssdk.services.s3.S3Client
-import software.amazon.awssdk.services.s3.model.CreateBucketRequest
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest
 import software.amazon.awssdk.services.s3.model.PutObjectRequest
 import software.amazon.awssdk.services.s3.model.S3Exception
 
-@SpringBootTest(webEnvironment = RANDOM_PORT)
-@Testcontainers
-@ActiveProfiles("test")
-@TestInstance(TestInstance.Lifecycle.PER_CLASS)
-class S3ViewerApiIntegrationTest {
-
-    companion object {
-        @Container
-        @JvmField
-        val localstack: LocalStackContainer =
-            LocalStackContainer(
-                DockerImageName.parse("docker.io/localstack/localstack:4")
-                    .asCompatibleSubstituteFor("localstack/localstack")
-            )
-                .withServices(S3)
-
-        @JvmStatic
-        @DynamicPropertySource
-        fun configureProperties(registry: DynamicPropertyRegistry) {
-            registry.add("s3-viewer.providers[0].id") { "test" }
-            registry.add("s3-viewer.providers[0].name") { "Test LocalStack" }
-            registry.add("s3-viewer.providers[0].region") { "us-east-1" }
-            registry.add("s3-viewer.providers[0].access-key") { "test" }
-            registry.add("s3-viewer.providers[0].secret-key") { "test" }
-            registry.add("s3-viewer.providers[0].path-style-access") { true }
-            registry.add("s3-viewer.providers[0].buckets[0]") { "test-bucket" }
-            registry.add("s3-viewer.providers[0].endpoint") {
-                ensureLocalstackStarted()
-                localstack.getEndpointOverride(S3).toString()
-            }
-        }
-
-        private fun ensureLocalstackStarted() {
-            if (!localstack.isRunning) {
-                localstack.start()
-            }
-        }
-    }
+class S3ViewerApiIntegrationTest : S3ViewerLocalStackIntegrationTest() {
 
     @LocalServerPort
     private var port: Int = 0
@@ -78,27 +25,21 @@ class S3ViewerApiIntegrationTest {
 
     @BeforeAll
     fun seedData() {
-        ensureLocalstackStarted()
-        val s3 = S3Client.builder()
-            .endpointOverride(localstack.getEndpointOverride(S3))
-            .credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create("test", "test")))
-            .region(Region.US_EAST_1)
-            .forcePathStyle(true)
-            .build()
-
-        s3.createBucket(CreateBucketRequest.builder().bucket("test-bucket").build())
-        s3.putObject(
-            PutObjectRequest.builder().bucket("test-bucket").key("docs/readme.txt").build(),
-            RequestBody.fromString("Hello S3 Viewer")
-        )
-        s3.putObject(
-            PutObjectRequest.builder().bucket("test-bucket").key("images/photo.jpg").build(),
-            RequestBody.fromBytes(ByteArray(128))
-        )
-        s3.putObject(
-            PutObjectRequest.builder().bucket("test-bucket").key("data.csv").build(),
-            RequestBody.fromString("col1,col2\nval1,val2")
-        )
+        s3Client().use { s3 ->
+            ensureTestBucketExists(s3)
+            s3.putObject(
+                PutObjectRequest.builder().bucket("test-bucket").key("docs/readme.txt").build(),
+                RequestBody.fromString("Hello S3 Viewer")
+            )
+            s3.putObject(
+                PutObjectRequest.builder().bucket("test-bucket").key("images/photo.jpg").build(),
+                RequestBody.fromBytes(ByteArray(128))
+            )
+            s3.putObject(
+                PutObjectRequest.builder().bucket("test-bucket").key("data.csv").build(),
+                RequestBody.fromString("col1,col2\nval1,val2")
+            )
+        }
     }
 
     @Test
@@ -174,29 +115,24 @@ class S3ViewerApiIntegrationTest {
 
     @Test
     fun `delete objects removes them from the bucket`() {
-        // seed the object we'll delete
-        val s3 = S3Client.builder()
-            .endpointOverride(localstack.getEndpointOverride(S3))
-            .credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create("test", "test")))
-            .region(Region.US_EAST_1)
-            .forcePathStyle(true)
-            .build()
-        s3.putObject(
-            PutObjectRequest.builder().bucket("test-bucket").key("to-delete.txt").build(),
-            RequestBody.fromString("bye")
-        )
+        s3Client().use { s3 ->
+            s3.putObject(
+                PutObjectRequest.builder().bucket("test-bucket").key("to-delete.txt").build(),
+                RequestBody.fromString("bye")
+            )
 
-        webTestClient.method(HttpMethod.DELETE)
-            .uri("/s3-viewer/api/v1/providers/test/buckets/test-bucket/objects")
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue("""{"keys":["to-delete.txt"]}""")
-            .exchange()
-            .expectStatus().isNoContent
+            webTestClient.method(HttpMethod.DELETE)
+                .uri("/s3-viewer/api/v1/providers/test/buckets/test-bucket/objects")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""{"keys":["to-delete.txt"]}""")
+                .exchange()
+                .expectStatus().isNoContent
 
-        val exception = assertThrows(S3Exception::class.java) {
-            s3.headObject(HeadObjectRequest.builder().bucket("test-bucket").key("to-delete.txt").build())
+            val exception = assertThrows(S3Exception::class.java) {
+                s3.headObject(HeadObjectRequest.builder().bucket("test-bucket").key("to-delete.txt").build())
+            }
+            assertEquals(404, exception.statusCode())
         }
-        assertEquals(404, exception.statusCode())
     }
 
     @Test
