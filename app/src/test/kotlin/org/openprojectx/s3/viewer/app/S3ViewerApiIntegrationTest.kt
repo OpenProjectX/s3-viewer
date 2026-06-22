@@ -43,7 +43,7 @@ class S3ViewerApiIntegrationTest : S3ViewerLocalStackIntegrationTest() {
     }
 
     @Test
-    fun `list providers returns configured test provider`() {
+    fun `api crud flow lists browses downloads uploads searches and deletes objects`() {
         webTestClient.get().uri("/s3-viewer/api/v1/providers")
             .exchange()
             .expectStatus().isOk
@@ -51,20 +51,14 @@ class S3ViewerApiIntegrationTest : S3ViewerLocalStackIntegrationTest() {
             .jsonPath("$[0].id").isEqualTo("test")
             .jsonPath("$[0].name").isEqualTo("Test LocalStack")
             .jsonPath("$[0].pathStyleAccess").isEqualTo(true)
-    }
 
-    @Test
-    fun `list buckets returns configured bucket`() {
         webTestClient.get().uri("/s3-viewer/api/v1/providers/test/buckets")
             .exchange()
             .expectStatus().isOk
             .expectBody()
             .jsonPath("$[0].name").isEqualTo("test-bucket")
             .jsonPath("$[0].providerId").isEqualTo("test")
-    }
 
-    @Test
-    fun `browse bucket root lists top-level entries`() {
         webTestClient.get().uri("/s3-viewer/api/v1/providers/test/buckets/test-bucket/browse")
             .exchange()
             .expectStatus().isOk
@@ -75,29 +69,20 @@ class S3ViewerApiIntegrationTest : S3ViewerLocalStackIntegrationTest() {
             .jsonPath("$.entries[?(@.name == 'data.csv')].type").isEqualTo("FILE")
             .jsonPath("$.entries[?(@.name == 'docs')].type").isEqualTo("DIRECTORY")
             .jsonPath("$.entries[?(@.name == 'images')].type").isEqualTo("DIRECTORY")
-    }
 
-    @Test
-    fun `browse bucket subdirectory lists contained files`() {
         webTestClient.get().uri("/s3-viewer/api/v1/providers/test/buckets/test-bucket/browse?path=docs/")
             .exchange()
             .expectStatus().isOk
             .expectBody()
             .jsonPath("$.entries[?(@.name == 'readme.txt')].type").isEqualTo("FILE")
-    }
 
-    @Test
-    fun `download object streams file content`() {
         webTestClient.get()
             .uri("/s3-viewer/api/v1/providers/test/buckets/test-bucket/download?key=docs/readme.txt")
             .exchange()
             .expectStatus().isOk
             .expectHeader().valueMatches("Content-Disposition", ".*readme\\.txt.*")
             .expectBody(String::class.java).isEqualTo("Hello S3 Viewer")
-    }
 
-    @Test
-    fun `upload object appears in subsequent browse`() {
         val content = "uploaded content".toByteArray()
         webTestClient.post()
             .uri("/s3-viewer/api/v1/providers/test/buckets/test-bucket/upload?path=uploads/")
@@ -111,10 +96,28 @@ class S3ViewerApiIntegrationTest : S3ViewerLocalStackIntegrationTest() {
             .expectBody()
             .jsonPath("$.name").isEqualTo("new.txt")
             .jsonPath("$.type").isEqualTo("FILE")
-    }
 
-    @Test
-    fun `delete objects removes them from the bucket`() {
+        webTestClient.get().uri("/s3-viewer/api/v1/providers/test/buckets/test-bucket/browse?path=uploads/")
+            .exchange()
+            .expectStatus().isOk
+            .expectBody()
+            .jsonPath("$.entries[?(@.name == 'new.txt')].type").isEqualTo("FILE")
+
+        webTestClient.get()
+            .uri("/s3-viewer/api/v1/providers/test/buckets/test-bucket/search?query=readme")
+            .exchange()
+            .expectStatus().isOk
+            .expectBody()
+            .jsonPath("$.query").isEqualTo("readme")
+            .jsonPath("$.entries[?(@.name == 'readme.txt')]").exists()
+
+        webTestClient.get()
+            .uri("/s3-viewer/api/v1/providers/test/buckets/test-bucket/search?query=nonexistent-xyz")
+            .exchange()
+            .expectStatus().isOk
+            .expectBody()
+            .jsonPath("$.entries").isEmpty
+
         s3Client().use { s3 ->
             s3.putObject(
                 PutObjectRequest.builder().bucket("test-bucket").key("to-delete.txt").build(),
@@ -133,26 +136,5 @@ class S3ViewerApiIntegrationTest : S3ViewerLocalStackIntegrationTest() {
             }
             assertEquals(404, exception.statusCode())
         }
-    }
-
-    @Test
-    fun `search objects returns matching entries`() {
-        webTestClient.get()
-            .uri("/s3-viewer/api/v1/providers/test/buckets/test-bucket/search?query=readme")
-            .exchange()
-            .expectStatus().isOk
-            .expectBody()
-            .jsonPath("$.query").isEqualTo("readme")
-            .jsonPath("$.entries[?(@.name == 'readme.txt')]").exists()
-    }
-
-    @Test
-    fun `search objects returns empty for no matches`() {
-        webTestClient.get()
-            .uri("/s3-viewer/api/v1/providers/test/buckets/test-bucket/search?query=nonexistent-xyz")
-            .exchange()
-            .expectStatus().isOk
-            .expectBody()
-            .jsonPath("$.entries").isEmpty
     }
 }
