@@ -113,6 +113,9 @@ jobs:
           OSSRH_PASSWORD: ${{ secrets.OSSRH_PASSWORD }}
           SIGNING_KEY_FILE: ${{ runner.temp }}/signing-key.asc
           SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+          JIB_TO_IMAGE: ghcr.io/openprojectx/s3-viewer
+          JIB_TO_USERNAME: ${{ github.actor }}
+          JIB_TO_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
         run: |
           skip_test_args=()
           if [ "$SKIP_TESTS" = "true" ]; then
@@ -154,6 +157,7 @@ jobs:
             echo "- Version: \`${version}\`"
             echo "- Release result: \`${RELEASE_OUTCOME}\`"
             echo "- Maven group: \`${group_id}\`"
+            echo "- Container image: \`ghcr.io/openprojectx/s3-viewer:${version}\`"
             echo
             if [ "$RELEASE_OUTCOME" != "success" ]; then
               echo "> The release step did not complete successfully. The artifacts below are the planned Maven Central coordinates; check the Gradle log to confirm whether any partial uploads happened before the failure."

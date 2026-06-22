@@ -1,5 +1,6 @@
 plugins {
     id("buildsrc.convention.spring-kotlin")
+    id("com.google.cloud.tools.jib") version "3.4.5"
 }
 
 dependencies {
@@ -19,6 +20,39 @@ dependencies {
     testImplementation("software.amazon.awssdk:auth")
 
     testImplementation("com.microsoft.playwright:playwright:${libs.versions.playwright.get()}")
+}
+
+jib {
+    from {
+        image = providers.gradleProperty("jibFromImage")
+            .orElse("eclipse-temurin:17-jre")
+            .get()
+    }
+    to {
+        image = providers.gradleProperty("jibToImage")
+            .orElse(providers.environmentVariable("JIB_TO_IMAGE"))
+            .orElse("ghcr.io/openprojectx/s3-viewer")
+            .get()
+        tags = setOf(project.version.toString())
+
+        val username = providers.gradleProperty("jibToUsername")
+            .orElse(providers.environmentVariable("JIB_TO_USERNAME"))
+            .orNull
+        val password = providers.gradleProperty("jibToPassword")
+            .orElse(providers.environmentVariable("JIB_TO_PASSWORD"))
+            .orNull
+
+        if (!username.isNullOrBlank() && !password.isNullOrBlank()) {
+            auth {
+                this.username = username
+                this.password = password
+            }
+        }
+    }
+    container {
+        ports = listOf("8081")
+        creationTime = "USE_CURRENT_TIMESTAMP"
+    }
 }
 
 // Standard integration tests (API-level, no browser required)

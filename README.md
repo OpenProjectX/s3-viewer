@@ -61,6 +61,34 @@ For LocalStack (dev profile), see `app/src/main/resources/application-dev.yaml`.
 
 Set `s3-viewer.read-only-access=true` to reject all write operations. Upload and delete requests return `403`, and the bundled UI hides upload, delete, and multi-select controls.
 
+Provider configuration can also be supplied entirely through environment variables. Spring Boot maps indexed list properties like `s3-viewer.providers[0].id` to env vars using uppercase names and underscores:
+
+```bash
+export S3_VIEWER_READ_ONLY_ACCESS=true
+export S3_VIEWER_PROVIDERS_0_ID=aws
+export S3_VIEWER_PROVIDERS_0_NAME="AWS S3"
+export S3_VIEWER_PROVIDERS_0_ENDPOINT=https://s3.amazonaws.com
+export S3_VIEWER_PROVIDERS_0_REGION=us-east-1
+export S3_VIEWER_PROVIDERS_0_ACCESS_KEY="$AWS_ACCESS_KEY_ID"
+export S3_VIEWER_PROVIDERS_0_SECRET_KEY="$AWS_SECRET_ACCESS_KEY"
+export S3_VIEWER_PROVIDERS_0_PATH_STYLE_ACCESS=false
+export S3_VIEWER_PROVIDERS_0_BUCKETS_0=my-bucket
+export S3_VIEWER_PROVIDERS_0_BUCKETS_1=another-bucket
+```
+
+For multiple providers, increment the provider index:
+
+```bash
+export S3_VIEWER_PROVIDERS_1_ID=minio
+export S3_VIEWER_PROVIDERS_1_NAME=MinIO
+export S3_VIEWER_PROVIDERS_1_ENDPOINT=http://minio:9000
+export S3_VIEWER_PROVIDERS_1_REGION=us-east-1
+export S3_VIEWER_PROVIDERS_1_ACCESS_KEY=minioadmin
+export S3_VIEWER_PROVIDERS_1_SECRET_KEY=minioadmin
+export S3_VIEWER_PROVIDERS_1_PATH_STYLE_ACCESS=true
+export S3_VIEWER_PROVIDERS_1_BUCKETS_0=demo
+```
+
 ### Reverse proxy / context path
 
 When the application sits behind a reverse proxy that **does not strip** its path prefix, tell the UI where the API lives:
@@ -97,6 +125,83 @@ In dev mode the Vite server proxies `/s3-viewer/api` requests to the Spring app 
 ./gradlew :app:bootJar
 
 ./gradlew release -Prelease.useAutomaticVersion=true
+```
+
+## Container Image
+
+Release builds publish the standalone app image to GitHub Container Registry:
+
+```bash
+docker pull ghcr.io/openprojectx/s3-viewer:<version>
+```
+
+Run with the default application config:
+
+```bash
+docker run --rm -p 8081:8081 ghcr.io/openprojectx/s3-viewer:<version>
+```
+
+The UI is available at `http://localhost:8081/s3-viewer/ui/`.
+
+For real S3 providers, mount a Spring Boot config file into `/config/application.yaml`:
+
+```bash
+docker run --rm -p 8081:8081 \
+  -v "$PWD/application.yaml:/config/application.yaml:ro" \
+  ghcr.io/openprojectx/s3-viewer:<version>
+```
+
+Example `application.yaml`:
+
+```yaml
+s3-viewer:
+  read-only-access: true
+  providers:
+    - id: aws
+      name: AWS S3
+      endpoint: https://s3.amazonaws.com
+      region: us-east-1
+      access-key: ${AWS_ACCESS_KEY_ID}
+      secret-key: ${AWS_SECRET_ACCESS_KEY}
+      path-style-access: false
+      buckets:
+        - my-bucket
+```
+
+Pass credentials with environment variables:
+
+```bash
+docker run --rm -p 8081:8081 \
+  -e AWS_ACCESS_KEY_ID=... \
+  -e AWS_SECRET_ACCESS_KEY=... \
+  -v "$PWD/application.yaml:/config/application.yaml:ro" \
+  ghcr.io/openprojectx/s3-viewer:<version>
+```
+
+You can also configure providers directly with container environment variables and skip the mounted YAML file:
+
+```bash
+docker run --rm -p 8081:8081 \
+  -e S3_VIEWER_READ_ONLY_ACCESS=true \
+  -e S3_VIEWER_PROVIDERS_0_ID=aws \
+  -e S3_VIEWER_PROVIDERS_0_NAME="AWS S3" \
+  -e S3_VIEWER_PROVIDERS_0_ENDPOINT=https://s3.amazonaws.com \
+  -e S3_VIEWER_PROVIDERS_0_REGION=us-east-1 \
+  -e S3_VIEWER_PROVIDERS_0_ACCESS_KEY=... \
+  -e S3_VIEWER_PROVIDERS_0_SECRET_KEY=... \
+  -e S3_VIEWER_PROVIDERS_0_PATH_STYLE_ACCESS=false \
+  -e S3_VIEWER_PROVIDERS_0_BUCKETS_0=my-bucket \
+  ghcr.io/openprojectx/s3-viewer:<version>
+```
+
+Local image builds use Jib and do not require a Dockerfile:
+
+```bash
+# Build into the local Docker daemon
+./gradlew :app:jibDockerBuild
+
+# Push to a registry
+JIB_TO_IMAGE=ghcr.io/openprojectx/s3-viewer ./gradlew :app:jib
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the full dev setup, Dev Container instructions, and how to run the app locally.
