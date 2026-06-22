@@ -81,6 +81,16 @@ jobs:
         with:
           cache-read-only: false
 
+      - name: Cache Jib
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/google-cloud-tools-java/jib
+            ~/.gradle/caches/jib
+          key: jib-${{ runner.os }}-${{ hashFiles('app/build.gradle.kts', 'build.gradle.kts', 'gradle/libs.versions.toml', 'gradle.properties') }}
+          restore-keys: |
+            jib-${{ runner.os }}-
+
       - name: Configure git
         run: |
           git config user.name "github-actions[bot]"
