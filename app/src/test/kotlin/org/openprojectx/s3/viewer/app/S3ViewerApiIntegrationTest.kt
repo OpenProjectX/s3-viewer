@@ -1,11 +1,15 @@
 package org.openprojectx.s3.viewer.app
 
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment.RANDOM_PORT
 import org.springframework.boot.test.web.server.LocalServerPort
+import org.springframework.http.HttpMethod
+import org.springframework.http.MediaType
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
@@ -21,7 +25,9 @@ import software.amazon.awssdk.core.sync.RequestBody
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.S3Client
 import software.amazon.awssdk.services.s3.model.CreateBucketRequest
+import software.amazon.awssdk.services.s3.model.HeadObjectRequest
 import software.amazon.awssdk.services.s3.model.PutObjectRequest
+import software.amazon.awssdk.services.s3.model.S3Exception
 
 @SpringBootTest(webEnvironment = RANDOM_PORT)
 @Testcontainers
@@ -180,13 +186,17 @@ class S3ViewerApiIntegrationTest {
             RequestBody.fromString("bye")
         )
 
+        webTestClient.method(HttpMethod.DELETE)
+            .uri("/s3-viewer/api/v1/providers/test/buckets/test-bucket/objects")
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue("""{"keys":["to-delete.txt"]}""")
+            .exchange()
+            .expectStatus().isNoContent
 
-//        webTestClient.delete()
-//            .uri("/s3-viewer/api/v1/providers/test/buckets/test-bucket/objects")
-//            .bodyValue("""{"keys":["to-delete.txt"]}""")
-//            .header("Content-Type", "application/json")
-//            .exchange()
-//            .expectStatus().isNoContent
+        val exception = assertThrows(S3Exception::class.java) {
+            s3.headObject(HeadObjectRequest.builder().bucket("test-bucket").key("to-delete.txt").build())
+        }
+        assertEquals(404, exception.statusCode())
     }
 
     @Test
