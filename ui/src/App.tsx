@@ -6,6 +6,7 @@ import { ThemeProvider } from '@mui/material/styles'
 import theme from './theme'
 import Sidebar from './components/Sidebar'
 import FileExplorer from './components/FileExplorer'
+import { readOnlyAccess } from './api'
 
 const App: React.FC = () => {
   const [selection, setSelection] = useState<{ providerId: string; bucketName: string } | null>(
@@ -28,6 +29,7 @@ const App: React.FC = () => {
               key={`${selection.providerId}/${selection.bucketName}`}
               providerId={selection.providerId}
               bucketName={selection.bucketName}
+              readOnlyAccess={readOnlyAccess}
             />
           ) : (
             <Box

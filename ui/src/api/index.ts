@@ -10,13 +10,15 @@ import type {
 
 declare global {
   interface Window {
-    __S3_VIEWER_CONFIG__?: { apiBase: string }
+    __S3_VIEWER_CONFIG__?: { apiBase: string; readOnlyAccess?: boolean }
   }
 }
 
 // Resolved at runtime from config.js injected by Spring Boot.
 // Falls back to the default path for local dev convenience.
 const apiBase = window.__S3_VIEWER_CONFIG__?.apiBase ?? '/s3-viewer/api/v1'
+
+export const readOnlyAccess = window.__S3_VIEWER_CONFIG__?.readOnlyAccess ?? false
 
 const client = axios.create({ baseURL: apiBase })
 

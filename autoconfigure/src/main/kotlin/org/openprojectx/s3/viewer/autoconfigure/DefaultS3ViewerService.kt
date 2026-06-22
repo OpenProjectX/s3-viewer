@@ -23,7 +23,7 @@ import java.util.concurrent.ConcurrentHashMap
 import kotlin.io.path.invariantSeparatorsPathString
 import kotlin.io.path.name
 
-internal class DefaultS3ViewerService(
+internal open class DefaultS3ViewerService(
     private val properties: S3ViewerProperties
 ) : S3ViewerService {
 
@@ -97,7 +97,7 @@ internal class DefaultS3ViewerService(
         )
     }
 
-    override fun uploadObject(
+    open override fun uploadObject(
         providerId: String,
         bucketName: String,
         path: String?,
@@ -130,7 +130,7 @@ internal class DefaultS3ViewerService(
         )
     }
 
-    override fun deleteObjects(providerId: String, bucketName: String, keys: List<String>) {
+    open override fun deleteObjects(providerId: String, bucketName: String, keys: List<String>) {
         val provider = getProvider(providerId)
         requireAllowedBucket(provider, bucketName)
 

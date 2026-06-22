@@ -33,7 +33,8 @@ class S3ViewerWebAutoConfiguration {
         RouterFunctions.route(
             org.springframework.web.reactive.function.server.RequestPredicates.GET("/s3-viewer/ui/config.js")
         ) { _ ->
-            val js = "window.__S3_VIEWER_CONFIG__ = { apiBase: '${properties.ui.apiBasePath}/v1' };"
+            val js =
+                "window.__S3_VIEWER_CONFIG__ = { apiBase: '${properties.ui.apiBasePath}/v1', readOnlyAccess: ${properties.readOnlyAccess} };"
             ServerResponse.ok()
                 .contentType(MediaType.parseMediaType("application/javascript"))
                 .bodyValue(js)

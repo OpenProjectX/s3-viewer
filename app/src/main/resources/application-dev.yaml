@@ -5,6 +5,7 @@ spring:
     base-path: /dev/service
 
 s3-viewer:
+  read-only-access: false
   providers:
     - id: localstack
       name: LocalStack

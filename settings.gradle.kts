@@ -2,14 +2,39 @@ import java.io.File
 
 pluginManagement {
     repositories {
+        mavenLocal()
+
+        val isCi = System.getenv().containsKey("CI") ||
+                System.getenv().containsKey("GITHUB_ACTIONS") ||
+                System.getenv().containsKey("JENKINS_HOME")
+
+        if (!isCi) {
+            maven(url = "https://mirrors.tencent.com/nexus/repository/maven-public/")
+            maven(url = "https://maven.aliyun.com/repository/gradle-plugin")
+        }
+
         gradlePluginPortal()
-        maven(url = "https://repo.spring.io/plugins-release")
     }
 }
 
 dependencyResolutionManagement {
     repositories {
+        mavenLocal()
+
+        val isCi = System.getenv().containsKey("CI") ||
+                System.getenv().containsKey("GITHUB_ACTIONS") ||
+                System.getenv().containsKey("JENKINS_HOME")
+
+        if (!isCi) {
+            maven(url = "https://mirrors.tencent.com/nexus/repository/maven-public/")
+            maven(url = "https://maven.aliyun.com/repository/public/")
+        }
+
         mavenCentral()
+        gradlePluginPortal()
+        maven(url = "https://packages.confluent.io/maven/")
+        maven(url = "https://repository.cloudera.com/repository/cloudera-repos/")
+
     }
 }
 

@@ -120,6 +120,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ObjectEntry"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
   /s3-viewer/api/v1/providers/{providerId}/buckets/{bucketName}/objects:
@@ -139,6 +141,8 @@ paths:
       responses:
         "204":
           description: Objects deleted successfully
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
   /s3-viewer/api/v1/providers/{providerId}/buckets/{bucketName}/search:
@@ -193,6 +197,12 @@ components:
       schema:
         type: string
   responses:
+    Forbidden:
+      description: Write operation is forbidden by readonly configuration
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
     NotFound:
       description: Requested resource was not found
       content:

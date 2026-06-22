@@ -12,7 +12,7 @@ const devConfigPlugin = () => ({
   configureServer(server: { middlewares: { use: (path: string, handler: Connect.NextHandleFunction) => void } }) {
     server.middlewares.use('/config.js', (_req, res) => {
       res.setHeader('Content-Type', 'application/javascript')
-      res.end(`window.__S3_VIEWER_CONFIG__ = { apiBase: '${DEV_API_BASE}' };`)
+      res.end(`window.__S3_VIEWER_CONFIG__ = { apiBase: '${DEV_API_BASE}', readOnlyAccess: false };`)
     })
   },
 })

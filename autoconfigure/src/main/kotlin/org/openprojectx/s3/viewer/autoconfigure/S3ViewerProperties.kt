@@ -10,6 +10,7 @@ import org.springframework.validation.annotation.Validated
 data class S3ViewerProperties(
     @field:Valid
     val providers: List<Provider> = emptyList(),
+    val readOnlyAccess: Boolean = false,
     val ui: UiProperties = UiProperties()
 ) {
     data class UiProperties(

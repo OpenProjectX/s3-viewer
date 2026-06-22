@@ -45,11 +45,12 @@ import { formatBytes, formatDate } from '../utils/format'
 interface FileExplorerProps {
   providerId: string
   bucketName: string
+  readOnlyAccess?: boolean
 }
 
 type ViewMode = 'list' | 'grid'
 
-const FileExplorer: React.FC<FileExplorerProps> = ({ providerId, bucketName }) => {
+const FileExplorer: React.FC<FileExplorerProps> = ({ providerId, bucketName, readOnlyAccess = false }) => {
   const [path, setPath] = useState('')
   const [entries, setEntries] = useState<ObjectEntry[]>([])
   const [parentPath, setParentPath] = useState<string | null>(null)
@@ -166,6 +167,15 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ providerId, bucketName }) =
           />
           <Box sx={{ flex: 1 }} />
 
+          {readOnlyAccess && (
+            <Chip
+              label="Read-only"
+              size="small"
+              color="default"
+              variant="outlined"
+            />
+          )}
+
           {/* Search */}
           <TextField
             size="small"
@@ -205,17 +215,19 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ providerId, bucketName }) =
           </ToggleButtonGroup>
 
           {/* Upload */}
-          <Button
-            variant="contained"
-            size="small"
-            startIcon={<UploadFileIcon />}
-            onClick={() => setUploadOpen(true)}
-          >
-            Upload
-          </Button>
+          {!readOnlyAccess && (
+            <Button
+              variant="contained"
+              size="small"
+              startIcon={<UploadFileIcon />}
+              onClick={() => setUploadOpen(true)}
+            >
+              Upload
+            </Button>
+          )}
 
           {/* Delete selected */}
-          {selected.size > 0 && (
+          {!readOnlyAccess && selected.size > 0 && (
             <Button
               variant="outlined"
               color="error"
@@ -255,14 +267,16 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ providerId, bucketName }) =
           <Table size="small" stickyHeader>
             <TableHead>
               <TableRow>
-                <TableCell padding="checkbox">
-                  <Checkbox
-                    size="small"
-                    indeterminate={selected.size > 0 && selected.size < entries.length}
-                    checked={entries.length > 0 && selected.size === entries.length}
-                    onChange={toggleSelectAll}
-                  />
-                </TableCell>
+                {!readOnlyAccess && (
+                  <TableCell padding="checkbox">
+                    <Checkbox
+                      size="small"
+                      indeterminate={selected.size > 0 && selected.size < entries.length}
+                      checked={entries.length > 0 && selected.size === entries.length}
+                      onChange={toggleSelectAll}
+                    />
+                  </TableCell>
+                )}
                 <TableCell>Name</TableCell>
                 <TableCell align="right">Size</TableCell>
                 <TableCell align="right">Last Modified</TableCell>
@@ -277,7 +291,7 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ providerId, bucketName }) =
                   sx={{ cursor: 'pointer' }}
                   onClick={() => handleNavigate(parentPath)}
                 >
-                  <TableCell padding="checkbox" />
+                  {!readOnlyAccess && <TableCell padding="checkbox" />}
                   <TableCell>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                       <ArrowUpwardIcon fontSize="small" sx={{ color: 'text.secondary' }} />
@@ -297,14 +311,16 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ providerId, bucketName }) =
                   selected={selected.has(entry.key)}
                   sx={{ cursor: entry.type === 'DIRECTORY' ? 'pointer' : 'default' }}
                 >
-                  <TableCell padding="checkbox">
-                    <Checkbox
-                      size="small"
-                      checked={selected.has(entry.key)}
-                      onChange={() => toggleSelect(entry.key)}
-                      onClick={(e) => e.stopPropagation()}
-                    />
-                  </TableCell>
+                  {!readOnlyAccess && (
+                    <TableCell padding="checkbox">
+                      <Checkbox
+                        size="small"
+                        checked={selected.has(entry.key)}
+                        onChange={() => toggleSelect(entry.key)}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </TableCell>
+                  )}
                   <TableCell onClick={() => handleEntryClick(entry)}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                       <FileIcon
@@ -385,7 +401,9 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ providerId, bucketName }) =
                     onClick={() => handleEntryClick(entry)}
                     onContextMenu={(e) => {
                       e.preventDefault()
-                      toggleSelect(entry.key)
+                      if (!readOnlyAccess) {
+                        toggleSelect(entry.key)
+                      }
                     }}
                     sx={{ p: 1.5, textAlign: 'center' }}
                   >

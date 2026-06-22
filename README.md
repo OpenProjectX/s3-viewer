@@ -43,6 +43,7 @@ Provider configuration lives under `s3-viewer.providers` in `application.yaml`:
 
 ```yaml
 s3-viewer:
+  read-only-access: false
   providers:
     - id: my-provider
       name: My S3
@@ -57,6 +58,8 @@ s3-viewer:
 ```
 
 For LocalStack (dev profile), see `app/src/main/resources/application-dev.yaml`.
+
+Set `s3-viewer.read-only-access=true` to reject all write operations. Upload and delete requests return `403`, and the bundled UI hides upload, delete, and multi-select controls.
 
 ### Reverse proxy / context path
 
@@ -82,6 +85,8 @@ The `ui` module is a React + Vite + MUI single-page application. Features:
 - **Upload** — drag & drop or file picker with per-file progress bars
 - **Download** — direct download button per file
 - **Delete** — multi-select with confirmation dialog
+
+When `s3-viewer.read-only-access=true`, write controls are hidden and the backend still rejects upload/delete requests with `403`.
 
 In dev mode the Vite server proxies `/s3-viewer/api` requests to the Spring app on port `8081`.
 

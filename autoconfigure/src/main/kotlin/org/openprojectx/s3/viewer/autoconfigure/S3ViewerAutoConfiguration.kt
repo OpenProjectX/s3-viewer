@@ -10,4 +10,8 @@ import org.springframework.context.annotation.Bean
 class S3ViewerAutoConfiguration {
     @Bean
     fun s3ViewerService(properties: S3ViewerProperties): S3ViewerService = DefaultS3ViewerService(properties)
+
+    @Bean
+    fun readOnlyAccessAspect(properties: S3ViewerProperties): ReadOnlyAccessAspect =
+        ReadOnlyAccessAspect(properties)
 }
