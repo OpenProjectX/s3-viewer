@@ -14,10 +14,11 @@ s3-viewer:
       access-key: test
       secret-key: test
       path-style-access: true
-      buckets:
-        - demo-assets
-        - demo-archive
-        - spark-iceberg-s3-367557846245616
+      all-buckets: true
+#      buckets:
+#        - demo-assets
+#        - demo-archive
+#        - spark-sql-prep-s3
     - id: rustfs
       name: rustfs
       endpoint: https://s3.cn-guangzhou-a.k8s.openprojectx.org

@@ -60,6 +60,21 @@ s3-viewer:
         - another-bucket
 ```
 
+Use `all-buckets: true` to list and allow every bucket visible to the provider credentials instead of maintaining an explicit bucket allow-list:
+
+```yaml
+s3-viewer:
+  providers:
+    - id: my-provider
+      name: My S3
+      endpoint: https://s3.amazonaws.com
+      region: us-east-1
+      access-key: AKIAIOSFODNN7EXAMPLE
+      secret-key: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+      path-style-access: false
+      all-buckets: true
+```
+
 For LocalStack (dev profile), see `app/src/main/resources/application-dev.yaml`.
 
 Set `s3-viewer.read-only-access=true` to reject all write operations. Upload and delete requests return `403`, and the bundled UI hides upload, delete, and multi-select controls.
@@ -201,8 +216,7 @@ s3-viewer:
       access-key: ${AWS_ACCESS_KEY_ID}
       secret-key: ${AWS_SECRET_ACCESS_KEY}
       path-style-access: false
-      buckets:
-        - my-bucket
+      all-buckets: true
 ```
 
 Pass credentials with environment variables:

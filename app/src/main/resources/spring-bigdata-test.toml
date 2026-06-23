@@ -17,6 +17,7 @@ databaseHostPort = 0
 
 [ports]
 hiveMetastore = 9083
+localStackS3 = 4443
 
 [containerLogs]
 mode = "STDOUT"

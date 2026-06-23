@@ -65,7 +65,7 @@ function previewKind(entry: ObjectEntry): PreviewData['kind'] | null {
   if (name.endsWith('.parquet')) return 'parquet'
   if (name.endsWith('.avsc')) return 'avro-schema'
   if (name.endsWith('.avro')) return 'avro-data'
-  if (name.endsWith('.txt') || name.endsWith('.json')) return 'text'
+  if (name.endsWith('.txt') || name.endsWith('.text') || name.endsWith('.json')) return 'text'
   return null
 }
 

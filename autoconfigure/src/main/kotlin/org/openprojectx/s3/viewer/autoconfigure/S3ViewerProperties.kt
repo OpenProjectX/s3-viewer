@@ -37,6 +37,9 @@ data class S3ViewerProperties(
         @field:NotBlank
         val secretKey: String,
         val pathStyleAccess: Boolean = true,
+        val allBuckets: Boolean = false,
         val buckets: List<String> = emptyList()
-    )
+    ) {
+        fun allowsAllBuckets(): Boolean = allBuckets || buckets.isEmpty()
+    }
 }

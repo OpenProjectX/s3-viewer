@@ -14,6 +14,8 @@ import org.springframework.http.HttpMethod
 import org.springframework.http.MediaType
 import org.springframework.test.web.reactive.server.WebTestClient
 import software.amazon.awssdk.core.sync.RequestBody
+import software.amazon.awssdk.services.s3.S3Client
+import software.amazon.awssdk.services.s3.model.CreateBucketRequest
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest
 import software.amazon.awssdk.services.s3.model.PutObjectRequest
 import software.amazon.awssdk.services.s3.model.S3Exception
@@ -45,9 +47,18 @@ class S3ViewerApiIntegrationTest : S3ViewerLocalStackIntegrationTest() {
     fun seedData() {
         s3Client().use { s3 ->
             ensureTestBucketExists(s3)
+            s3.createBucketIfMissing("archive-bucket")
             s3.putObject(
                 PutObjectRequest.builder().bucket("test-bucket").key("docs/readme.txt").build(),
                 RequestBody.fromString("Hello S3 Viewer")
+            )
+            s3.putObject(
+                PutObjectRequest.builder()
+                    .bucket("test-bucket")
+                    .key("docs/plain.text")
+                    .contentType("application/octet-stream")
+                    .build(),
+                RequestBody.fromString("Plain text extension")
             )
             s3.putObject(
                 PutObjectRequest.builder()
@@ -102,8 +113,9 @@ class S3ViewerApiIntegrationTest : S3ViewerLocalStackIntegrationTest() {
             .exchange()
             .expectStatus().isOk
             .expectBody()
-            .jsonPath("$[0].name").isEqualTo("test-bucket")
-            .jsonPath("$[0].providerId").isEqualTo("test")
+            .jsonPath("$[?(@.name == 'test-bucket')].providerId").isEqualTo("test")
+            .jsonPath("$[?(@.name == 'archive-bucket')].configured").isEqualTo(false)
+            .jsonPath("$[?(@.name == 'test-bucket')].configured").isEqualTo(false)
 
         webTestClient.get().uri("/s3-viewer/api/v1/providers/test/buckets/test-bucket/browse")
             .exchange()
@@ -165,6 +177,16 @@ class S3ViewerApiIntegrationTest : S3ViewerLocalStackIntegrationTest() {
             .jsonPath("$.contentType").isEqualTo("application/octet-stream")
             .jsonPath("$.truncated").isEqualTo(false)
             .jsonPath("$.content").isEqualTo("""{"enabled":true}""")
+
+        webTestClient.get()
+            .uri("/s3-viewer/api/v1/providers/test/buckets/test-bucket/preview/text?key=docs/plain.text")
+            .exchange()
+            .expectStatus().isOk
+            .expectBody()
+            .jsonPath("$.fileName").isEqualTo("plain.text")
+            .jsonPath("$.contentType").isEqualTo("application/octet-stream")
+            .jsonPath("$.truncated").isEqualTo(false)
+            .jsonPath("$.content").isEqualTo("Plain text extension")
 
         webTestClient.get()
             .uri("/s3-viewer/api/v1/providers/test/buckets/test-bucket/preview/avro/schema?key=schemas/user-event.avsc")
@@ -284,5 +306,15 @@ class S3ViewerApiIntegrationTest : S3ViewerLocalStackIntegrationTest() {
             writer.append(secondRecord)
         }
         return output.toByteArray()
+    }
+
+    private fun S3Client.createBucketIfMissing(bucketName: String) {
+        try {
+            createBucket(CreateBucketRequest.builder().bucket(bucketName).build())
+        } catch (exception: S3Exception) {
+            if (exception.statusCode() != 409) {
+                throw exception
+            }
+        }
     }
 }

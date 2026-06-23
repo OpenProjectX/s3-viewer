@@ -31,6 +31,7 @@ import software.amazon.awssdk.http.apache.ProxyConfiguration
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.S3Client
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest
+import software.amazon.awssdk.services.s3.model.ListBucketsRequest
 import software.amazon.awssdk.services.s3.model.ListObjectsV2Request
 import software.amazon.awssdk.services.s3.model.PutObjectRequest
 import software.amazon.awssdk.services.s3.model.S3Exception
@@ -67,18 +68,29 @@ internal open class DefaultS3ViewerService(
             name = provider.name,
             endpoint = provider.endpoint,
             region = provider.region,
-            bucketCount = provider.buckets.size,
+            bucketCount = if (provider.allowsAllBuckets()) 0 else provider.buckets.size,
             pathStyleAccess = provider.pathStyleAccess
         )
     }
 
     override fun listBuckets(providerId: String): List<ViewerBucket> {
         val provider = getProvider(providerId)
-        return provider.buckets.map { bucket ->
+        val bucketNames = if (provider.allowsAllBuckets()) {
+            s3Client(provider).use { s3 ->
+                s3.listBuckets(ListBucketsRequest.builder().build())
+                    .buckets()
+                    .map { it.name() }
+                    .sortedWith(String.CASE_INSENSITIVE_ORDER)
+            }
+        } else {
+            provider.buckets
+        }
+
+        return bucketNames.map { bucket ->
             ViewerBucket(
                 providerId = provider.id,
                 name = bucket,
-                configured = true
+                configured = !provider.allowsAllBuckets()
             )
         }
     }
@@ -506,7 +518,7 @@ internal open class DefaultS3ViewerService(
             ?: throw S3ViewerException("Provider '$providerId' is not configured")
 
     private fun requireAllowedBucket(provider: S3ViewerProperties.Provider, bucketName: String) {
-        if (provider.buckets.isNotEmpty() && bucketName !in provider.buckets) {
+        if (!provider.allowsAllBuckets() && bucketName !in provider.buckets) {
             throw S3ViewerException("Bucket '$bucketName' is not configured for provider '${provider.id}'")
         }
     }
@@ -735,6 +747,7 @@ internal open class DefaultS3ViewerService(
         val lowerContentType = contentType.lowercase()
         return lowerContentType.startsWith("text/") ||
                 lowerContentType in TEXT_PREVIEW_CONTENT_TYPES ||
+                lowerName.endsWith(".text") ||
                 lowerName.endsWith(".txt") ||
                 lowerName.endsWith(".json")
     }

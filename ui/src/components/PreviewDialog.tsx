@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import Alert from '@mui/material/Alert'
 import Box from '@mui/material/Box'
 import Chip from '@mui/material/Chip'
@@ -8,8 +8,13 @@ import DialogContent from '@mui/material/DialogContent'
 import DialogTitle from '@mui/material/DialogTitle'
 import IconButton from '@mui/material/IconButton'
 import Stack from '@mui/material/Stack'
+import ToggleButton from '@mui/material/ToggleButton'
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
+import Tooltip from '@mui/material/Tooltip'
 import Typography from '@mui/material/Typography'
 import CloseIcon from '@mui/icons-material/Close'
+import CodeIcon from '@mui/icons-material/Code'
+import FormatAlignLeftIcon from '@mui/icons-material/FormatAlignLeft'
 import { Highlight, themes } from 'prism-react-renderer'
 import type { Language } from 'prism-react-renderer'
 
@@ -21,6 +26,8 @@ type PreviewData =
   | { kind: 'parquet'; value: ParquetSchemaPreviewResponse }
   | { kind: 'avro-schema'; value: AvroSchemaPreviewResponse }
   | { kind: 'avro-data'; value: AvroDataPreviewResponse }
+
+type FormatMode = 'raw' | 'pretty'
 
 interface PreviewDialogProps {
   open: boolean
@@ -70,8 +77,81 @@ function previewLanguage(data: PreviewData): Language {
   return 'text'
 }
 
+function canFormatPreview(language: Language): boolean {
+  return ['json', 'xml', 'html'].includes(language)
+}
+
+function formatPreviewContent(content: string, language: Language): string {
+  if (language === 'json') {
+    return formatJsonContent(content)
+  }
+  if (language === 'xml' || language === 'html') {
+    return formatMarkupContent(content)
+  }
+  return content
+}
+
+function formatJsonContent(content: string): string {
+  try {
+    return JSON.stringify(JSON.parse(content), null, 2)
+  } catch {
+    const lines = content.split(/\r?\n/).filter((line) => line.trim().length > 0)
+    if (lines.length <= 1) {
+      return content
+    }
+
+    try {
+      return lines.map((line) => JSON.stringify(JSON.parse(line), null, 2)).join('\n')
+    } catch {
+      return content
+    }
+  }
+}
+
+function formatMarkupContent(content: string): string {
+  const normalized = content
+    .replace(/>\s+</g, '><')
+    .replace(/></g, '>\n<')
+    .trim()
+
+  if (!normalized) {
+    return content
+  }
+
+  let depth = 0
+  return normalized
+    .split('\n')
+    .map((line) => {
+      const trimmed = line.trim()
+      if (/^<\/[^>]+>/.test(trimmed)) {
+        depth = Math.max(depth - 1, 0)
+      }
+      const formatted = `${'  '.repeat(depth)}${trimmed}`
+      if (
+        /^<[^!?/][^>]*[^/]?>$/.test(trimmed) &&
+        !/^<[^>]+>.*<\/[^>]+>$/.test(trimmed)
+      ) {
+        depth += 1
+      }
+      return formatted
+    })
+    .join('\n')
+}
+
 const PreviewDialog: React.FC<PreviewDialogProps> = ({ open, loading, error, data, onClose }) => {
   const title = data?.value.fileName ?? 'Preview'
+  const [formatMode, setFormatMode] = useState<FormatMode>('pretty')
+  const rawContent = data ? previewContent(data) : ''
+  const language = data ? previewLanguage(data) : 'text'
+  const canFormat = data ? canFormatPreview(language) : false
+  const displayedContent = useMemo(
+    () => (data && canFormat && formatMode === 'pretty' ? formatPreviewContent(rawContent, language) : rawContent),
+    [canFormat, data, formatMode, language, rawContent]
+  )
+
+  useEffect(() => {
+    setFormatMode('pretty')
+  }, [rawContent])
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth>
@@ -117,8 +197,32 @@ const PreviewDialog: React.FC<PreviewDialogProps> = ({ open, loading, error, dat
               {data.kind === 'avro-data' && data.value.truncated && (
                 <Chip label="Truncated preview" size="small" color="warning" variant="outlined" />
               )}
+              {canFormat && (
+                <ToggleButtonGroup
+                  size="small"
+                  exclusive
+                  value={formatMode}
+                  onChange={(_, nextMode: FormatMode | null) => {
+                    if (nextMode) {
+                      setFormatMode(nextMode)
+                    }
+                  }}
+                  sx={{ ml: 'auto' }}
+                >
+                  <ToggleButton value="pretty" aria-label="Pretty format">
+                    <Tooltip title="Pretty format">
+                      <FormatAlignLeftIcon fontSize="small" />
+                    </Tooltip>
+                  </ToggleButton>
+                  <ToggleButton value="raw" aria-label="Raw source">
+                    <Tooltip title="Raw source">
+                      <CodeIcon fontSize="small" />
+                    </Tooltip>
+                  </ToggleButton>
+                </ToggleButtonGroup>
+              )}
             </Stack>
-            <Highlight theme={themes.github} code={previewContent(data)} language={previewLanguage(data)}>
+            <Highlight theme={themes.github} code={displayedContent} language={language}>
               {({ className, style, tokens, getLineProps, getTokenProps }) => (
                 <Box
                   component="pre"

@@ -43,6 +43,7 @@ abstract class S3ViewerLocalStackIntegrationTest {
             registry.add("s3-viewer.providers[0].access-key") { "test" }
             registry.add("s3-viewer.providers[0].secret-key") { "test" }
             registry.add("s3-viewer.providers[0].path-style-access") { true }
+            registry.add("s3-viewer.providers[0].all-buckets") { true }
             registry.add("s3-viewer.providers[0].buckets[0]") { TEST_BUCKET }
             registry.add("s3-viewer.providers[0].endpoint") {
                 startLocalstackIfNecessary()
