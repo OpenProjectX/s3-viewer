@@ -60,6 +60,16 @@ export interface AvroSchemaPreviewResponse {
   schema: string
 }
 
+export interface AvroDataPreviewResponse {
+  key: string
+  fileName: string
+  size?: number | null
+  schema: string
+  truncated: boolean
+  recordCount: number
+  content: string
+}
+
 export interface CreateFolderRequest {
   path?: string | null
   folderName: string

@@ -13,13 +13,14 @@ import CloseIcon from '@mui/icons-material/Close'
 import { Highlight, themes } from 'prism-react-renderer'
 import type { Language } from 'prism-react-renderer'
 
-import type { AvroSchemaPreviewResponse, ParquetSchemaPreviewResponse, TextPreviewResponse } from '../types/api'
+import type { AvroDataPreviewResponse, AvroSchemaPreviewResponse, ParquetSchemaPreviewResponse, TextPreviewResponse } from '../types/api'
 import { formatBytes } from '../utils/format'
 
 type PreviewData =
   | { kind: 'text'; value: TextPreviewResponse }
   | { kind: 'parquet'; value: ParquetSchemaPreviewResponse }
-  | { kind: 'avro'; value: AvroSchemaPreviewResponse }
+  | { kind: 'avro-schema'; value: AvroSchemaPreviewResponse }
+  | { kind: 'avro-data'; value: AvroDataPreviewResponse }
 
 interface PreviewDialogProps {
   open: boolean
@@ -30,14 +31,17 @@ interface PreviewDialogProps {
 }
 
 function previewContent(data: PreviewData): string {
-  return data.kind === 'text' ? data.value.content : data.value.schema
+  if (data.kind === 'text' || data.kind === 'avro-data') {
+    return data.value.content
+  }
+  return data.value.schema
 }
 
 function previewLanguage(data: PreviewData): Language {
   if (data.kind === 'parquet') {
     return 'sql'
   }
-  if (data.kind === 'avro') {
+  if (data.kind === 'avro-schema' || data.kind === 'avro-data') {
     return 'json'
   }
 
@@ -77,7 +81,8 @@ const PreviewDialog: React.FC<PreviewDialogProps> = ({ open, loading, error, dat
             {title}
           </Typography>
           {data?.kind === 'parquet' && <Chip label="Parquet schema" size="small" />}
-          {data?.kind === 'avro' && <Chip label="Avro schema" size="small" />}
+          {data?.kind === 'avro-schema' && <Chip label="Avro schema" size="small" />}
+          {data?.kind === 'avro-data' && <Chip label="Avro data" size="small" />}
           {data?.kind === 'text' && <Chip label={data.value.contentType} size="small" />}
         </Stack>
         <IconButton
@@ -105,6 +110,12 @@ const PreviewDialog: React.FC<PreviewDialogProps> = ({ open, loading, error, dat
               )}
               {data.kind === 'text' && data.value.truncated && (
                 <Chip label="Truncated to first 1 MiB" size="small" color="warning" variant="outlined" />
+              )}
+              {data.kind === 'avro-data' && (
+                <Chip label={`${data.value.recordCount} records`} size="small" variant="outlined" />
+              )}
+              {data.kind === 'avro-data' && data.value.truncated && (
+                <Chip label="Truncated preview" size="small" color="warning" variant="outlined" />
               )}
             </Stack>
             <Highlight theme={themes.github} code={previewContent(data)} language={previewLanguage(data)}>

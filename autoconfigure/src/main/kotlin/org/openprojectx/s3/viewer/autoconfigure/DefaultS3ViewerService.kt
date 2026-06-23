@@ -3,6 +3,7 @@ package org.openprojectx.s3.viewer.autoconfigure
 import org.openprojectx.s3.viewer.core.BucketBrowseResult
 import org.openprojectx.s3.viewer.core.BucketObjectEntry
 import org.openprojectx.s3.viewer.core.BucketObjectType
+import org.openprojectx.s3.viewer.core.AvroDataPreview
 import org.openprojectx.s3.viewer.core.AvroSchemaPreview
 import org.openprojectx.s3.viewer.core.ObjectDownload
 import org.openprojectx.s3.viewer.core.ParquetSchemaPreview
@@ -17,6 +18,8 @@ import org.apache.avro.file.DataFileReader
 import org.apache.avro.file.SeekableInput
 import org.apache.avro.generic.GenericDatumReader
 import org.apache.avro.generic.GenericRecord
+import org.apache.avro.generic.GenericDatumWriter
+import org.apache.avro.io.EncoderFactory
 import org.apache.parquet.hadoop.ParquetFileReader
 import org.apache.parquet.io.InputFile
 import org.apache.parquet.io.SeekableInputStream
@@ -283,6 +286,43 @@ internal open class DefaultS3ViewerService(
             )
         } catch (ex: Exception) {
             throw S3ViewerException("Failed to read Avro schema for object '$key'", ex)
+        }
+    }
+
+    override fun previewAvroData(providerId: String, bucketName: String, key: String, maxRecords: Int): AvroDataPreview {
+        val provider = getProvider(providerId)
+        requireAllowedBucket(provider, bucketName)
+        val path = resolveObjectPath(provider, bucketName, key)
+        val attributes = Files.readAttributes(path, BasicFileAttributes::class.java)
+        val fileName = path.name.ifBlank { key }
+        val contentType = detectContentType(provider, bucketName, key, path, fileName)
+
+        if (!isAvroDataPreviewSupported(fileName, contentType)) {
+            throw S3ViewerException("Object '$key' is not a supported Avro data preview type")
+        }
+
+        val recordLimit = maxRecords.coerceIn(1, MAX_AVRO_PREVIEW_RECORDS)
+        try {
+            SeekablePathInput(path, attributes.size()).use { input ->
+                DataFileReader.openReader<GenericRecord>(input, GenericDatumReader()).use { reader ->
+                    val schema = reader.getSchema()
+                    val rows = mutableListOf<String>()
+                    while (reader.hasNext() && rows.size < recordLimit) {
+                        rows.add(schema.recordToJson(reader.next()))
+                    }
+                    return AvroDataPreview(
+                        key = key,
+                        fileName = fileName,
+                        size = attributes.size(),
+                        schema = schema.toString(emptyList<AvroSchema>(), true),
+                        truncated = reader.hasNext(),
+                        recordCount = rows.size,
+                        content = rows.toJsonArray()
+                    )
+                }
+            }
+        } catch (ex: Exception) {
+            throw S3ViewerException("Failed to read Avro data for object '$key'", ex)
         }
     }
 
@@ -713,8 +753,31 @@ internal open class DefaultS3ViewerService(
                 lowerContentType in AVRO_CONTENT_TYPES
     }
 
+    private fun isAvroDataPreviewSupported(fileName: String, contentType: String): Boolean {
+        val lowerName = fileName.lowercase()
+        val lowerContentType = contentType.lowercase()
+        return lowerName.endsWith(".avro") ||
+                lowerContentType in AVRO_DATA_CONTENT_TYPES
+    }
+
+    private fun AvroSchema.recordToJson(record: GenericRecord): String {
+        val output = ByteArrayOutputStream()
+        val encoder = EncoderFactory.get().jsonEncoder(this, output)
+        GenericDatumWriter<GenericRecord>(this).write(record, encoder)
+        encoder.flush()
+        return output.toString(Charsets.UTF_8)
+    }
+
+    private fun List<String>.toJsonArray(): String =
+        if (isEmpty()) {
+            "[]"
+        } else {
+            joinToString(separator = ",\n", prefix = "[\n", postfix = "\n]") { "  $it" }
+        }
+
     companion object {
         private const val MAX_TEXT_PREVIEW_BYTES = 1024 * 1024L
+        private const val MAX_AVRO_PREVIEW_RECORDS = 1_000
 
         private val TEXT_PREVIEW_CONTENT_TYPES = setOf(
             "application/json",
@@ -739,6 +802,8 @@ internal open class DefaultS3ViewerService(
             "application/vnd.apache.avro+json",
             "application/x-avro-schema"
         )
+
+        private val AVRO_DATA_CONTENT_TYPES = AVRO_CONTENT_TYPES - "application/x-avro-schema"
     }
 }
 

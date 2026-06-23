@@ -164,6 +164,37 @@ paths:
                 $ref: "#/components/schemas/AvroSchemaPreviewResponse"
         "404":
           $ref: "#/components/responses/NotFound"
+  /s3-viewer/api/v1/providers/{providerId}/buckets/{bucketName}/preview/avro/data:
+    get:
+      tags: [Viewer]
+      operationId: previewAvroData
+      summary: Preview Avro data as JSON records
+      parameters:
+        - $ref: "#/components/parameters/ProviderId"
+        - $ref: "#/components/parameters/BucketName"
+        - name: key
+          in: query
+          required: true
+          description: Avro object key to preview
+          schema:
+            type: string
+        - name: maxRecords
+          in: query
+          required: false
+          description: Maximum records to read for preview (default 100)
+          schema:
+            type: integer
+            format: int32
+            default: 100
+      responses:
+        "200":
+          description: Avro data preview returned successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AvroDataPreviewResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /s3-viewer/api/v1/providers/{providerId}/buckets/{bucketName}/upload:
     post:
       tags: [Viewer]
@@ -439,6 +470,27 @@ components:
           format: int64
           nullable: true
         schema:
+          type: string
+    AvroDataPreviewResponse:
+      type: object
+      required: [key, fileName, schema, truncated, recordCount, content]
+      properties:
+        key:
+          type: string
+        fileName:
+          type: string
+        size:
+          type: integer
+          format: int64
+          nullable: true
+        schema:
+          type: string
+        truncated:
+          type: boolean
+        recordCount:
+          type: integer
+          format: int32
+        content:
           type: string
     CreateFolderRequest:
       type: object

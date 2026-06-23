@@ -18,6 +18,8 @@ interface S3ViewerService {
 
     fun previewAvroSchema(providerId: String, bucketName: String, key: String): AvroSchemaPreview
 
+    fun previewAvroData(providerId: String, bucketName: String, key: String, maxRecords: Int): AvroDataPreview
+
     fun createFolder(providerId: String, bucketName: String, path: String?, folderName: String): BucketObjectEntry
 
     fun uploadObject(providerId: String, bucketName: String, path: String?, fileName: String, inputStream: InputStream): BucketObjectEntry
@@ -92,6 +94,16 @@ data class AvroSchemaPreview(
     val fileName: String,
     val size: Long?,
     val schema: String
+)
+
+data class AvroDataPreview(
+    val key: String,
+    val fileName: String,
+    val size: Long?,
+    val schema: String,
+    val truncated: Boolean,
+    val recordCount: Int,
+    val content: String
 )
 
 data class SearchResult(

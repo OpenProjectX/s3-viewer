@@ -8,11 +8,13 @@ import org.openprojectx.s3.viewer.autoconfigure.model.CreateFolderRequest
 import org.openprojectx.s3.viewer.autoconfigure.model.DeleteRequest
 import org.openprojectx.s3.viewer.autoconfigure.model.ObjectEntry
 import org.openprojectx.s3.viewer.autoconfigure.model.ObjectEntryType
+import org.openprojectx.s3.viewer.autoconfigure.model.AvroDataPreviewResponse
 import org.openprojectx.s3.viewer.autoconfigure.model.AvroSchemaPreviewResponse
 import org.openprojectx.s3.viewer.autoconfigure.model.ParquetSchemaPreviewResponse
 import org.openprojectx.s3.viewer.autoconfigure.model.ProviderSummary
 import org.openprojectx.s3.viewer.autoconfigure.model.SearchResponse
 import org.openprojectx.s3.viewer.autoconfigure.model.TextPreviewResponse
+import org.openprojectx.s3.viewer.core.AvroDataPreview
 import org.openprojectx.s3.viewer.core.AvroSchemaPreview
 import org.openprojectx.s3.viewer.core.BucketBrowseResult
 import org.openprojectx.s3.viewer.core.BucketObjectEntry
@@ -122,6 +124,24 @@ class ViewerController(
         Mono.fromSupplier {
             ResponseEntity.ok(
                 s3ViewerService.previewAvroSchema(providerId, bucketName, key).toApiModel()
+            )
+        }
+
+    override fun previewAvroData(
+        providerId: String,
+        bucketName: String,
+        key: String,
+        maxRecords: Int?,
+        exchange: ServerWebExchange
+    ): Mono<ResponseEntity<AvroDataPreviewResponse>> =
+        Mono.fromSupplier {
+            ResponseEntity.ok(
+                s3ViewerService.previewAvroData(
+                    providerId = providerId,
+                    bucketName = bucketName,
+                    key = key,
+                    maxRecords = maxRecords ?: 100
+                ).toApiModel()
             )
         }
 
@@ -254,6 +274,16 @@ private fun AvroSchemaPreview.toApiModel(): AvroSchemaPreviewResponse =
         .fileName(fileName)
         .size(size)
         .schema(schema)
+
+private fun AvroDataPreview.toApiModel(): AvroDataPreviewResponse =
+    AvroDataPreviewResponse()
+        .key(key)
+        .fileName(fileName)
+        .size(size)
+        .schema(schema)
+        .truncated(truncated)
+        .recordCount(recordCount)
+        .content(content)
 
 private fun BucketObjectType.toApiModel(): ObjectEntryType =
     when (this) {

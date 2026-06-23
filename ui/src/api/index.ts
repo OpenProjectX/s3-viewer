@@ -1,5 +1,6 @@
 import axios from 'axios'
 import type {
+  AvroDataPreviewResponse,
   AvroSchemaPreviewResponse,
   BrowseResponse,
   BucketSummary,
@@ -102,6 +103,19 @@ export async function previewAvroSchema(
   const { data } = await client.get<AvroSchemaPreviewResponse>(
     `/providers/${providerId}/buckets/${bucketName}/preview/avro/schema`,
     { params: { key } }
+  )
+  return data
+}
+
+export async function previewAvroData(
+  providerId: string,
+  bucketName: string,
+  key: string,
+  maxRecords = 100
+): Promise<AvroDataPreviewResponse> {
+  const { data } = await client.get<AvroDataPreviewResponse>(
+    `/providers/${providerId}/buckets/${bucketName}/preview/avro/data`,
+    { params: { key, maxRecords } }
   )
   return data
 }

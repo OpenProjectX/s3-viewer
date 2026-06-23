@@ -184,6 +184,18 @@ class S3ViewerApiIntegrationTest : S3ViewerLocalStackIntegrationTest() {
             .jsonPath("$.schema").value<String> { assertEquals(true, it.contains("UserEvent")) }
             .jsonPath("$.schema").value<String> { assertEquals(true, it.contains("enabled")) }
 
+        webTestClient.get()
+            .uri("/s3-viewer/api/v1/providers/test/buckets/test-bucket/preview/avro/data?key=warehouse/avro/user-event.avro&maxRecords=1")
+            .exchange()
+            .expectStatus().isOk
+            .expectBody()
+            .jsonPath("$.fileName").isEqualTo("user-event.avro")
+            .jsonPath("$.recordCount").isEqualTo(1)
+            .jsonPath("$.truncated").isEqualTo(true)
+            .jsonPath("$.schema").value<String> { assertEquals(true, it.contains("UserEvent")) }
+            .jsonPath("$.content").value<String> { assertEquals(true, it.contains("evt-1")) }
+            .jsonPath("$.content").value<String> { assertEquals(true, it.contains("enabled")) }
+
         webTestClient.post()
             .uri("/s3-viewer/api/v1/providers/test/buckets/test-bucket/folders")
             .contentType(MediaType.APPLICATION_JSON)
@@ -265,6 +277,11 @@ class S3ViewerApiIntegrationTest : S3ViewerLocalStackIntegrationTest() {
                 put("enabled", true)
             }
             writer.append(record)
+            val secondRecord = GenericData.Record(userSchema).apply {
+                put("id", "evt-2")
+                put("enabled", false)
+            }
+            writer.append(secondRecord)
         }
         return output.toByteArray()
     }

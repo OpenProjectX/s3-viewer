@@ -42,8 +42,8 @@ import UploadDialog from './UploadDialog'
 import DeleteDialog from './DeleteDialog'
 import PreviewDialog from './PreviewDialog'
 import CreateFolderDialog from './CreateFolderDialog'
-import { browseBucket, downloadObjectUrl, previewAvroSchema, previewParquetSchema, previewTextObject, searchObjects } from '../api'
-import type { AvroSchemaPreviewResponse, ObjectEntry, ParquetSchemaPreviewResponse, TextPreviewResponse } from '../types/api'
+import { browseBucket, downloadObjectUrl, previewAvroData, previewAvroSchema, previewParquetSchema, previewTextObject, searchObjects } from '../api'
+import type { AvroDataPreviewResponse, AvroSchemaPreviewResponse, ObjectEntry, ParquetSchemaPreviewResponse, TextPreviewResponse } from '../types/api'
 import { formatBytes, formatDate } from '../utils/format'
 
 interface FileExplorerProps {
@@ -56,13 +56,15 @@ type ViewMode = 'list' | 'grid'
 type PreviewData =
   | { kind: 'text'; value: TextPreviewResponse }
   | { kind: 'parquet'; value: ParquetSchemaPreviewResponse }
-  | { kind: 'avro'; value: AvroSchemaPreviewResponse }
+  | { kind: 'avro-schema'; value: AvroSchemaPreviewResponse }
+  | { kind: 'avro-data'; value: AvroDataPreviewResponse }
 
 function previewKind(entry: ObjectEntry): PreviewData['kind'] | null {
   if (entry.type !== 'FILE') return null
   const name = entry.name.toLowerCase()
   if (name.endsWith('.parquet')) return 'parquet'
-  if (name.endsWith('.avro') || name.endsWith('.avsc')) return 'avro'
+  if (name.endsWith('.avsc')) return 'avro-schema'
+  if (name.endsWith('.avro')) return 'avro-data'
   if (name.endsWith('.txt') || name.endsWith('.json')) return 'text'
   return null
 }
@@ -187,8 +189,11 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ providerId, bucketName, rea
       if (kind === 'parquet') {
         const result = await previewParquetSchema(providerId, bucketName, entry.key)
         setPreviewData({ kind, value: result })
-      } else if (kind === 'avro') {
+      } else if (kind === 'avro-schema') {
         const result = await previewAvroSchema(providerId, bucketName, entry.key)
+        setPreviewData({ kind, value: result })
+      } else if (kind === 'avro-data') {
+        const result = await previewAvroData(providerId, bucketName, entry.key)
         setPreviewData({ kind, value: result })
       } else {
         const result = await previewTextObject(providerId, bucketName, entry.key)
