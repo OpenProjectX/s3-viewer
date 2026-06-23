@@ -1,9 +1,14 @@
 package org.openprojectx.s3.viewer.app
 
+import org.apache.avro.Schema
+import org.apache.avro.file.DataFileWriter
+import org.apache.avro.generic.GenericData
+import org.apache.avro.generic.GenericDatumWriter
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
+import java.io.ByteArrayOutputStream
 import org.springframework.boot.test.web.server.LocalServerPort
 import org.springframework.http.HttpMethod
 import org.springframework.http.MediaType
@@ -14,6 +19,19 @@ import software.amazon.awssdk.services.s3.model.PutObjectRequest
 import software.amazon.awssdk.services.s3.model.S3Exception
 
 class S3ViewerApiIntegrationTest : S3ViewerLocalStackIntegrationTest() {
+    private val userSchemaJson = """
+        {
+          "type": "record",
+          "name": "UserEvent",
+          "namespace": "org.openprojectx.s3.viewer.test",
+          "fields": [
+            { "name": "id", "type": "string" },
+            { "name": "enabled", "type": "boolean" }
+          ]
+        }
+    """.trimIndent()
+
+    private val userSchema = Schema.Parser().parse(userSchemaJson)
 
     @LocalServerPort
     private var port: Int = 0
@@ -40,8 +58,28 @@ class S3ViewerApiIntegrationTest : S3ViewerLocalStackIntegrationTest() {
                 RequestBody.fromString("""{"enabled":true}""")
             )
             s3.putObject(
+                PutObjectRequest.builder()
+                    .bucket("test-bucket")
+                    .key("docs/reports/")
+                    .contentType("application/x-directory")
+                    .build(),
+                RequestBody.empty()
+            )
+            s3.putObject(
                 PutObjectRequest.builder().bucket("test-bucket").key("images/photo.jpg").build(),
                 RequestBody.fromBytes(ByteArray(128))
+            )
+            s3.putObject(
+                PutObjectRequest.builder().bucket("test-bucket").key("warehouse/hive-parquet/data.parquet").build(),
+                RequestBody.fromBytes(ByteArray(32))
+            )
+            s3.putObject(
+                PutObjectRequest.builder().bucket("test-bucket").key("schemas/user-event.avsc").build(),
+                RequestBody.fromString(userSchemaJson)
+            )
+            s3.putObject(
+                PutObjectRequest.builder().bucket("test-bucket").key("warehouse/avro/user-event.avro").build(),
+                RequestBody.fromBytes(avroContainerBytes())
             )
             s3.putObject(
                 PutObjectRequest.builder().bucket("test-bucket").key("data.csv").build(),
@@ -84,6 +122,21 @@ class S3ViewerApiIntegrationTest : S3ViewerLocalStackIntegrationTest() {
             .expectBody()
             .jsonPath("$.entries[?(@.name == 'readme.txt')].type").isEqualTo("FILE")
             .jsonPath("$.entries[?(@.name == 'config.json')].type").isEqualTo("FILE")
+            .jsonPath("$.entries[?(@.name == 'reports')].type").isEqualTo("DIRECTORY")
+
+        webTestClient.get().uri("/s3-viewer/api/v1/providers/test/buckets/test-bucket/browse?path=docs/reports")
+            .exchange()
+            .expectStatus().isOk
+            .expectBody()
+            .jsonPath("$.path").isEqualTo("docs/reports")
+            .jsonPath("$.entries").isEmpty
+
+        webTestClient.get().uri("/s3-viewer/api/v1/providers/test/buckets/test-bucket/browse?path=warehouse/hive-parquet")
+            .exchange()
+            .expectStatus().isOk
+            .expectBody()
+            .jsonPath("$.path").isEqualTo("warehouse/hive-parquet")
+            .jsonPath("$.entries[?(@.name == 'data.parquet')].type").isEqualTo("FILE")
 
         webTestClient.get()
             .uri("/s3-viewer/api/v1/providers/test/buckets/test-bucket/download?key=docs/readme.txt")
@@ -113,22 +166,40 @@ class S3ViewerApiIntegrationTest : S3ViewerLocalStackIntegrationTest() {
             .jsonPath("$.truncated").isEqualTo(false)
             .jsonPath("$.content").isEqualTo("""{"enabled":true}""")
 
+        webTestClient.get()
+            .uri("/s3-viewer/api/v1/providers/test/buckets/test-bucket/preview/avro/schema?key=schemas/user-event.avsc")
+            .exchange()
+            .expectStatus().isOk
+            .expectBody()
+            .jsonPath("$.fileName").isEqualTo("user-event.avsc")
+            .jsonPath("$.schema").value<String> { assertEquals(true, it.contains("UserEvent")) }
+            .jsonPath("$.schema").value<String> { assertEquals(true, it.contains("enabled")) }
+
+        webTestClient.get()
+            .uri("/s3-viewer/api/v1/providers/test/buckets/test-bucket/preview/avro/schema?key=warehouse/avro/user-event.avro")
+            .exchange()
+            .expectStatus().isOk
+            .expectBody()
+            .jsonPath("$.fileName").isEqualTo("user-event.avro")
+            .jsonPath("$.schema").value<String> { assertEquals(true, it.contains("UserEvent")) }
+            .jsonPath("$.schema").value<String> { assertEquals(true, it.contains("enabled")) }
+
         webTestClient.post()
             .uri("/s3-viewer/api/v1/providers/test/buckets/test-bucket/folders")
             .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue("""{"path":"docs","folderName":"reports"}""")
+            .bodyValue("""{"path":"docs","folderName":"adhoc"}""")
             .exchange()
             .expectStatus().isCreated
             .expectBody()
-            .jsonPath("$.name").isEqualTo("reports")
-            .jsonPath("$.key").isEqualTo("docs/reports")
+            .jsonPath("$.name").isEqualTo("adhoc")
+            .jsonPath("$.key").isEqualTo("docs/adhoc")
             .jsonPath("$.type").isEqualTo("DIRECTORY")
 
         webTestClient.get().uri("/s3-viewer/api/v1/providers/test/buckets/test-bucket/browse?path=docs/")
             .exchange()
             .expectStatus().isOk
             .expectBody()
-            .jsonPath("$.entries[?(@.name == 'reports')].type").isEqualTo("DIRECTORY")
+            .jsonPath("$.entries[?(@.name == 'adhoc')].type").isEqualTo("DIRECTORY")
 
         val content = "uploaded content".toByteArray()
         webTestClient.post()
@@ -183,5 +254,18 @@ class S3ViewerApiIntegrationTest : S3ViewerLocalStackIntegrationTest() {
             }
             assertEquals(404, exception.statusCode())
         }
+    }
+
+    private fun avroContainerBytes(): ByteArray {
+        val output = ByteArrayOutputStream()
+        DataFileWriter(GenericDatumWriter<GenericData.Record>(userSchema)).use { writer ->
+            writer.create(userSchema, output)
+            val record = GenericData.Record(userSchema).apply {
+                put("id", "evt-1")
+                put("enabled", true)
+            }
+            writer.append(record)
+        }
+        return output.toByteArray()
     }
 }

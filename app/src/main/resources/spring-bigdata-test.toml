@@ -1,0 +1,32 @@
+[services]
+hiveMetastore = true
+
+localStackS3 = true
+#schemaRegistry = true
+#kafka = true
+
+[hiveMetastore]
+databaseType = "mysql"
+databaseName = "metastore"
+databaseUser = "hive"
+databasePassword = "hive"
+# Optional: use a fixed host port for local database troubleshooting.
+#databaseHostPort = 3306
+databaseHostPort = 0
+
+
+[ports]
+hiveMetastore = 9083
+
+[containerLogs]
+mode = "STDOUT"
+directory = "build/container-logs"
+append = false
+
+[containerLogLevels]
+hiveMetastore = "DEBUG"
+
+[containers.localstackS3.env]
+DISABLE_CORS_CHECKS = "1"
+
+

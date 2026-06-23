@@ -1,0 +1,19 @@
+[[s3Buckets]]
+bucket = "spark-sql-prep-s3"
+
+[[extensions]]
+type = "spark-sql-prep"
+id = "prepare-tables"
+statements = [
+    "CREATE NAMESPACE IF NOT EXISTS prep_s3.demo",
+]
+scripts = [
+    "classpath:sql/create_tables.sql",
+]
+
+[extensions.configs]
+"spark.sql.extensions" = "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions"
+"spark.sql.catalog.prep_s3" = "org.apache.iceberg.spark.SparkCatalog"
+"spark.sql.catalog.prep_s3.type" = "hadoop"
+"spark.sql.catalog.prep_s3.warehouse" = "s3a://spark-sql-prep-s3/warehouse"
+"spark.sql.shuffle.partitions" = "1"

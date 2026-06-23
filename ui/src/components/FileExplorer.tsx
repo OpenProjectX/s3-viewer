@@ -42,8 +42,8 @@ import UploadDialog from './UploadDialog'
 import DeleteDialog from './DeleteDialog'
 import PreviewDialog from './PreviewDialog'
 import CreateFolderDialog from './CreateFolderDialog'
-import { browseBucket, downloadObjectUrl, previewParquetSchema, previewTextObject, searchObjects } from '../api'
-import type { ObjectEntry, ParquetSchemaPreviewResponse, TextPreviewResponse } from '../types/api'
+import { browseBucket, downloadObjectUrl, previewAvroSchema, previewParquetSchema, previewTextObject, searchObjects } from '../api'
+import type { AvroSchemaPreviewResponse, ObjectEntry, ParquetSchemaPreviewResponse, TextPreviewResponse } from '../types/api'
 import { formatBytes, formatDate } from '../utils/format'
 
 interface FileExplorerProps {
@@ -56,11 +56,13 @@ type ViewMode = 'list' | 'grid'
 type PreviewData =
   | { kind: 'text'; value: TextPreviewResponse }
   | { kind: 'parquet'; value: ParquetSchemaPreviewResponse }
+  | { kind: 'avro'; value: AvroSchemaPreviewResponse }
 
-function previewKind(entry: ObjectEntry): 'text' | 'parquet' | null {
+function previewKind(entry: ObjectEntry): PreviewData['kind'] | null {
   if (entry.type !== 'FILE') return null
   const name = entry.name.toLowerCase()
   if (name.endsWith('.parquet')) return 'parquet'
+  if (name.endsWith('.avro') || name.endsWith('.avsc')) return 'avro'
   if (name.endsWith('.txt') || name.endsWith('.json')) return 'text'
   return null
 }
@@ -184,6 +186,9 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ providerId, bucketName, rea
     try {
       if (kind === 'parquet') {
         const result = await previewParquetSchema(providerId, bucketName, entry.key)
+        setPreviewData({ kind, value: result })
+      } else if (kind === 'avro') {
+        const result = await previewAvroSchema(providerId, bucketName, entry.key)
         setPreviewData({ kind, value: result })
       } else {
         const result = await previewTextObject(providerId, bucketName, entry.key)

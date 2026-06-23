@@ -3,6 +3,7 @@ package org.openprojectx.s3.viewer.autoconfigure
 import org.openprojectx.s3.viewer.core.BucketBrowseResult
 import org.openprojectx.s3.viewer.core.BucketObjectEntry
 import org.openprojectx.s3.viewer.core.BucketObjectType
+import org.openprojectx.s3.viewer.core.AvroSchemaPreview
 import org.openprojectx.s3.viewer.core.ObjectDownload
 import org.openprojectx.s3.viewer.core.ParquetSchemaPreview
 import org.openprojectx.s3.viewer.core.S3ViewerException
@@ -11,16 +12,26 @@ import org.openprojectx.s3.viewer.core.SearchResult
 import org.openprojectx.s3.viewer.core.TextObjectPreview
 import org.openprojectx.s3.viewer.core.ViewerBucket
 import org.openprojectx.s3.viewer.core.ViewerProvider
+import org.apache.avro.Schema as AvroSchema
+import org.apache.avro.file.DataFileReader
+import org.apache.avro.file.SeekableInput
+import org.apache.avro.generic.GenericDatumReader
+import org.apache.avro.generic.GenericRecord
 import org.apache.parquet.hadoop.ParquetFileReader
 import org.apache.parquet.io.InputFile
 import org.apache.parquet.io.SeekableInputStream
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider
 import software.amazon.awssdk.core.sync.RequestBody
+import software.amazon.awssdk.http.apache.ApacheHttpClient
+import software.amazon.awssdk.http.apache.ProxyConfiguration
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.S3Client
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Request
 import software.amazon.awssdk.services.s3.model.PutObjectRequest
+import software.amazon.awssdk.services.s3.model.S3Exception
+import software.amazon.awssdk.services.s3.model.S3Object
 import software.amazon.nio.spi.s3.SpringAwareS3FileSystemProvider
 import java.io.ByteArrayOutputStream
 import java.io.EOFException
@@ -28,6 +39,7 @@ import java.io.InputStream
 import java.net.URI
 import java.net.URLConnection
 import java.nio.ByteBuffer
+import java.nio.channels.SeekableByteChannel
 import java.nio.file.FileSystem
 import java.nio.file.Files
 import java.nio.file.Path
@@ -73,13 +85,80 @@ internal open class DefaultS3ViewerService(
         requireAllowedBucket(provider, bucketName)
 
         val normalizedPath = normalizePath(path)
-        val directory = resolveDirectory(provider, bucketName, normalizedPath)
-        val entries = Files.list(directory).use { stream ->
-            stream
-                .map { entry -> toImmediateEntry(directory, normalizedPath, entry) }
-                .distinct()
-                .sorted(compareBy<BucketObjectEntry> { it.type != BucketObjectType.DIRECTORY }.thenBy(String.CASE_INSENSITIVE_ORDER) { it.name })
-                .toList()
+        val prefix = directoryPrefix(normalizedPath)
+        val entries = mutableListOf<BucketObjectEntry>()
+        var hasDirectoryMarker = normalizedPath.isBlank()
+
+        s3Client(provider).use { s3 ->
+            val response = try {
+                s3.listObjectsV2(
+                    ListObjectsV2Request.builder()
+                        .bucket(bucketName)
+                        .prefix(prefix)
+                        .delimiter("/")
+                        .build()
+                )
+            } catch (ex: S3Exception) {
+                if (ex.statusCode() == 404 && normalizedPath.isNotBlank()) {
+                    if (s3.directoryExists(bucketName, normalizedPath)) {
+                        hasDirectoryMarker = true
+                        null
+                    } else {
+                        throw S3ViewerException("Path '$normalizedPath' was not found in bucket '$bucketName'", ex)
+                    }
+                } else {
+                    throw ex
+                }
+            }
+
+            response?.commonPrefixes()?.forEach { commonPrefix ->
+                val key = commonPrefix.prefix().trimEnd('/')
+                val name = key.removePrefix(prefix).trim('/').substringBefore('/')
+                if (name.isNotBlank()) {
+                    entries.add(
+                        BucketObjectEntry(
+                            name = name,
+                            key = key,
+                            type = BucketObjectType.DIRECTORY
+                        )
+                    )
+                }
+            }
+
+            response?.contents()?.forEach { s3Object ->
+                val key = s3Object.key()
+                when {
+                    key == prefix -> hasDirectoryMarker = true
+                    key.endsWith("/") -> {
+                        val directoryKey = key.trimEnd('/')
+                        val name = directoryKey.removePrefix(prefix).trim('/').substringBefore('/')
+                        if (name.isNotBlank()) {
+                            entries.add(
+                                BucketObjectEntry(
+                                    name = name,
+                                    key = directoryKey,
+                                    type = BucketObjectType.DIRECTORY,
+                                    lastModified = s3Object.lastModified()
+                                )
+                            )
+                        }
+                    }
+                    else -> {
+                        val name = key.removePrefix(prefix)
+                        if (name.isNotBlank() && '/' !in name) {
+                            entries.add(s3Object.toFileEntry(key, name))
+                        }
+                    }
+                }
+            }
+        }
+
+        val sortedEntries = entries
+            .distinctBy { it.key }
+            .sortedWith(compareBy<BucketObjectEntry> { it.type != BucketObjectType.DIRECTORY }.thenBy(String.CASE_INSENSITIVE_ORDER) { it.name })
+
+        if (sortedEntries.isEmpty() && !hasDirectoryMarker && normalizedPath.isNotBlank()) {
+            throw S3ViewerException("Path '$normalizedPath' was not found in bucket '$bucketName'")
         }
 
         return BucketBrowseResult(
@@ -87,7 +166,7 @@ internal open class DefaultS3ViewerService(
             bucketName = bucketName,
             path = normalizedPath,
             parentPath = parentPath(normalizedPath),
-            entries = entries
+            entries = sortedEntries
         )
     }
 
@@ -169,6 +248,41 @@ internal open class DefaultS3ViewerService(
             )
         } catch (ex: Exception) {
             throw S3ViewerException("Failed to read parquet schema for object '$key'", ex)
+        }
+    }
+
+    override fun previewAvroSchema(providerId: String, bucketName: String, key: String): AvroSchemaPreview {
+        val provider = getProvider(providerId)
+        requireAllowedBucket(provider, bucketName)
+        val path = resolveObjectPath(provider, bucketName, key)
+        val attributes = Files.readAttributes(path, BasicFileAttributes::class.java)
+        val fileName = path.name.ifBlank { key }
+        val contentType = detectContentType(provider, bucketName, key, path, fileName)
+
+        if (!isAvroPreviewSupported(fileName, contentType)) {
+            throw S3ViewerException("Object '$key' is not a supported Avro preview type")
+        }
+
+        try {
+            val schema = if (fileName.lowercase().endsWith(".avsc")) {
+                Files.newInputStream(path).use { input ->
+                    AvroSchema.Parser().parse(input).toString(emptyList<AvroSchema>(), true)
+                }
+            } else {
+                SeekablePathInput(path, attributes.size()).use { input ->
+                    DataFileReader.openReader<GenericRecord>(input, GenericDatumReader()).use { reader ->
+                        reader.getSchema().toString(emptyList<AvroSchema>(), true)
+                    }
+                }
+            }
+            return AvroSchemaPreview(
+                key = key,
+                fileName = fileName,
+                size = attributes.size(),
+                schema = schema
+            )
+        } catch (ex: Exception) {
+            throw S3ViewerException("Failed to read Avro schema for object '$key'", ex)
         }
     }
 
@@ -280,24 +394,64 @@ internal open class DefaultS3ViewerService(
         requireAllowedBucket(provider, bucketName)
 
         val normalizedPath = normalizePath(path)
-        val rootDir = resolveDirectory(provider, bucketName, normalizedPath)
+        val prefix = directoryPrefix(normalizedPath)
         val lowerQuery = query.lowercase()
 
-        val entries = Files.walk(rootDir).use { stream ->
-            stream
-                .filter { !Files.isDirectory(it) || it != rootDir }
-                .map { entry -> toEntry(rootDir, entry) }
-                .filter { it.name.lowercase().contains(lowerQuery) }
-                .sorted(compareBy<BucketObjectEntry> { it.type != BucketObjectType.DIRECTORY }.thenBy(String.CASE_INSENSITIVE_ORDER) { it.name })
-                .limit(maxResults.toLong())
-                .toList()
+        val entries = linkedMapOf<String, BucketObjectEntry>()
+        s3Client(provider).use { s3 ->
+            val request = ListObjectsV2Request.builder()
+                .bucket(bucketName)
+                .prefix(prefix)
+                .build()
+
+            s3.listObjectsV2Paginator(request).forEach { response ->
+                response.contents().forEach { s3Object ->
+                    val key = s3Object.key()
+                    if (key == prefix) {
+                        return@forEach
+                    }
+
+                    val relative = key.removePrefix(prefix).trim('/')
+                    if (relative.isBlank()) {
+                        return@forEach
+                    }
+
+                    val parts = relative.split('/').filter { it.isNotBlank() }
+                    val directoryParts = if (key.endsWith("/")) parts else parts.dropLast(1)
+                    var directoryKey = normalizedPath
+                    directoryParts.forEach { part ->
+                        directoryKey = listOf(directoryKey, part)
+                            .filter { it.isNotBlank() }
+                            .joinToString("/")
+                        if (part.lowercase().contains(lowerQuery)) {
+                            entries.putIfAbsent(
+                                directoryKey,
+                                BucketObjectEntry(
+                                    name = part,
+                                    key = directoryKey,
+                                    type = BucketObjectType.DIRECTORY
+                                )
+                            )
+                        }
+                    }
+
+                    if (!key.endsWith("/")) {
+                        val name = parts.lastOrNull().orEmpty()
+                        if (name.lowercase().contains(lowerQuery)) {
+                            entries.putIfAbsent(key, s3Object.toFileEntry(key, name))
+                        }
+                    }
+                }
+            }
         }
 
         return SearchResult(
             providerId = provider.id,
             bucketName = bucketName,
             query = query,
-            entries = entries
+            entries = entries.values
+                .sortedWith(compareBy<BucketObjectEntry> { it.type != BucketObjectType.DIRECTORY }.thenBy(String.CASE_INSENSITIVE_ORDER) { it.name })
+                .take(maxResults)
         )
     }
 
@@ -410,6 +564,62 @@ internal open class DefaultS3ViewerService(
             ?.trim('/')
             .orEmpty()
 
+    private fun directoryPrefix(path: String): String =
+        if (path.isBlank()) "" else "$path/"
+
+    private fun S3Client.directoryExists(bucketName: String, normalizedPath: String): Boolean {
+        val prefix = directoryPrefix(normalizedPath)
+        if (objectExists(bucketName, prefix)) {
+            return true
+        }
+
+        val parent = parentPath(normalizedPath).orEmpty()
+        val parentPrefix = directoryPrefix(parent)
+        val response = try {
+            listObjectsV2(
+                ListObjectsV2Request.builder()
+                    .bucket(bucketName)
+                    .prefix(parentPrefix)
+                    .delimiter("/")
+                    .build()
+            )
+        } catch (ex: S3Exception) {
+            if (ex.statusCode() == 404) {
+                return false
+            }
+            throw ex
+        }
+
+        return response.commonPrefixes().any { it.prefix() == prefix } ||
+                response.contents().any { it.key() == prefix }
+    }
+
+    private fun S3Client.objectExists(bucketName: String, key: String): Boolean =
+        try {
+            headObject(
+                HeadObjectRequest.builder()
+                    .bucket(bucketName)
+                    .key(key)
+                    .build()
+            )
+            true
+        } catch (ex: S3Exception) {
+            if (ex.statusCode() == 404) {
+                false
+            } else {
+                throw ex
+            }
+        }
+
+    private fun S3Object.toFileEntry(key: String, name: String): BucketObjectEntry =
+        BucketObjectEntry(
+            name = name,
+            key = key,
+            type = BucketObjectType.FILE,
+            size = size(),
+            lastModified = lastModified()
+        )
+
     private fun normalizeFolderName(folderName: String): String {
         val normalized = folderName.trim().trim('/')
         if (normalized.isBlank()) {
@@ -461,6 +671,15 @@ internal open class DefaultS3ViewerService(
 
     private fun s3Client(provider: S3ViewerProperties.Provider): S3Client =
         S3Client.builder()
+            .httpClientBuilder(
+                ApacheHttpClient.builder()
+                    .proxyConfiguration(
+                        ProxyConfiguration.builder()
+                            .useSystemPropertyValues(false)
+                            .useEnvironmentVariableValues(false)
+                            .build()
+                    )
+            )
             .region(Region.of(provider.region))
             .endpointOverride(URI.create(provider.endpoint))
             .forcePathStyle(provider.pathStyleAccess)
@@ -486,6 +705,14 @@ internal open class DefaultS3ViewerService(
         return lowerName.endsWith(".parquet") || lowerContentType in PARQUET_CONTENT_TYPES
     }
 
+    private fun isAvroPreviewSupported(fileName: String, contentType: String): Boolean {
+        val lowerName = fileName.lowercase()
+        val lowerContentType = contentType.lowercase()
+        return lowerName.endsWith(".avro") ||
+                lowerName.endsWith(".avsc") ||
+                lowerContentType in AVRO_CONTENT_TYPES
+    }
+
     companion object {
         private const val MAX_TEXT_PREVIEW_BYTES = 1024 * 1024L
 
@@ -502,6 +729,16 @@ internal open class DefaultS3ViewerService(
             "application/vnd.apache.parquet",
             "application/x-parquet"
         )
+
+        private val AVRO_CONTENT_TYPES = setOf(
+            "application/avro",
+            "application/avro-binary",
+            "application/vnd.apache.avro",
+            "application/x-avro",
+            "application/x-avro-binary",
+            "application/vnd.apache.avro+json",
+            "application/x-avro-schema"
+        )
     }
 }
 
@@ -513,6 +750,28 @@ private class SeekablePathInputFile(
 
     override fun newStream(): SeekableInputStream =
         SeekablePathInputStream(path)
+}
+
+private class SeekablePathInput(
+    path: Path,
+    private val length: Long
+) : SeekableInput {
+    private val channel: SeekableByteChannel = Files.newByteChannel(path, StandardOpenOption.READ)
+
+    override fun seek(p: Long) {
+        channel.position(p)
+    }
+
+    override fun tell(): Long = channel.position()
+
+    override fun length(): Long = length
+
+    override fun read(b: ByteArray, off: Int, len: Int): Int =
+        channel.read(ByteBuffer.wrap(b, off, len))
+
+    override fun close() {
+        channel.close()
+    }
 }
 
 private class SeekablePathInputStream(path: Path) : SeekableInputStream() {

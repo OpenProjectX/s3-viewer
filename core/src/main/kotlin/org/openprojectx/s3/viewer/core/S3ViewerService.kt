@@ -16,6 +16,8 @@ interface S3ViewerService {
 
     fun previewParquetSchema(providerId: String, bucketName: String, key: String): ParquetSchemaPreview
 
+    fun previewAvroSchema(providerId: String, bucketName: String, key: String): AvroSchemaPreview
+
     fun createFolder(providerId: String, bucketName: String, path: String?, folderName: String): BucketObjectEntry
 
     fun uploadObject(providerId: String, bucketName: String, path: String?, fileName: String, inputStream: InputStream): BucketObjectEntry
@@ -79,6 +81,13 @@ data class TextObjectPreview(
 )
 
 data class ParquetSchemaPreview(
+    val key: String,
+    val fileName: String,
+    val size: Long?,
+    val schema: String
+)
+
+data class AvroSchemaPreview(
     val key: String,
     val fileName: String,
     val size: Long?,

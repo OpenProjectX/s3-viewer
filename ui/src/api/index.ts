@@ -1,5 +1,6 @@
 import axios from 'axios'
 import type {
+  AvroSchemaPreviewResponse,
   BrowseResponse,
   BucketSummary,
   CreateFolderRequest,
@@ -88,6 +89,18 @@ export async function previewParquetSchema(
 ): Promise<ParquetSchemaPreviewResponse> {
   const { data } = await client.get<ParquetSchemaPreviewResponse>(
     `/providers/${providerId}/buckets/${bucketName}/preview/parquet/schema`,
+    { params: { key } }
+  )
+  return data
+}
+
+export async function previewAvroSchema(
+  providerId: string,
+  bucketName: string,
+  key: string
+): Promise<AvroSchemaPreviewResponse> {
+  const { data } = await client.get<AvroSchemaPreviewResponse>(
+    `/providers/${providerId}/buckets/${bucketName}/preview/avro/schema`,
     { params: { key } }
   )
   return data

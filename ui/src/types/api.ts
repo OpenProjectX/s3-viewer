@@ -53,6 +53,13 @@ export interface ParquetSchemaPreviewResponse {
   schema: string
 }
 
+export interface AvroSchemaPreviewResponse {
+  key: string
+  fileName: string
+  size?: number | null
+  schema: string
+}
+
 export interface CreateFolderRequest {
   path?: string | null
   folderName: string

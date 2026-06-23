@@ -7,8 +7,8 @@ GET {{baseUrl}}/s3-viewer/api/v1/providers
 GET {{baseUrl}}/s3-viewer/api/v1/providers/{{providerId}}/buckets
 
 ### browse
-@bucketName = demo-assets
-GET {{baseUrl}}/s3-viewer/api/v1/providers/{{providerId}}/buckets/{{bucketName}}/browse?path=/
+@bucketName = spark-iceberg-s3-364470849402207
+GET {{baseUrl}}/s3-viewer/api/v1/providers/{{providerId}}/buckets/{{bucketName}}/browse?path=hive-parquet/
 
 ###
 GET {{baseUrl}}/s3-viewer/api/v1/providers/{{providerId}}/buckets/{{bucketName}}/download?

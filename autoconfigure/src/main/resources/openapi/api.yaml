@@ -141,6 +141,29 @@ paths:
                 $ref: "#/components/schemas/ParquetSchemaPreviewResponse"
         "404":
           $ref: "#/components/responses/NotFound"
+  /s3-viewer/api/v1/providers/{providerId}/buckets/{bucketName}/preview/avro/schema:
+    get:
+      tags: [Viewer]
+      operationId: previewAvroSchema
+      summary: Preview Avro schema without returning row data
+      parameters:
+        - $ref: "#/components/parameters/ProviderId"
+        - $ref: "#/components/parameters/BucketName"
+        - name: key
+          in: query
+          required: true
+          description: Avro object or schema key to inspect
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Avro schema returned successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AvroSchemaPreviewResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /s3-viewer/api/v1/providers/{providerId}/buckets/{bucketName}/upload:
     post:
       tags: [Viewer]
@@ -390,6 +413,20 @@ components:
         content:
           type: string
     ParquetSchemaPreviewResponse:
+      type: object
+      required: [key, fileName, schema]
+      properties:
+        key:
+          type: string
+        fileName:
+          type: string
+        size:
+          type: integer
+          format: int64
+          nullable: true
+        schema:
+          type: string
+    AvroSchemaPreviewResponse:
       type: object
       required: [key, fileName, schema]
       properties:

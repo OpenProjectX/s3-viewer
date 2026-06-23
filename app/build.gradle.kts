@@ -1,7 +1,14 @@
 plugins {
     id("buildsrc.convention.spring-kotlin")
     id("com.google.cloud.tools.jib") version "3.4.5"
+    id("org.openprojectx.bigdata-test") version "0.1.25"
 }
+
+bigDataTest {
+    config.add("classpath:spring-bigdata-test.toml")
+    extensionConfig.add("classpath:spring-bigdata-extensions.toml")
+}
+
 
 dependencies {
     implementation(project(":s3-viewer-spring-boot-starter"))
@@ -18,8 +25,10 @@ dependencies {
     testImplementation(platform("software.amazon.awssdk:bom:2.39.2"))
     testImplementation("software.amazon.awssdk:s3")
     testImplementation("software.amazon.awssdk:auth")
+    testImplementation("org.apache.avro:avro:1.12.1")
 
     testImplementation("com.microsoft.playwright:playwright:${libs.versions.playwright.get()}")
+
 }
 
 jib {

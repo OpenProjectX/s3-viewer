@@ -9,7 +9,7 @@ s3-viewer:
   providers:
     - id: localstack
       name: LocalStack
-      endpoint: ${LOCALSTACK_ENDPOINT:http://localhost:32822}
+      endpoint: ${LOCALSTACK_ENDPOINT:http://localhost:4443}
       region: us-east-1
       access-key: test
       secret-key: test
@@ -17,7 +17,7 @@ s3-viewer:
       buckets:
         - demo-assets
         - demo-archive
-        - spark-iceberg-s3-315743701367333
+        - spark-iceberg-s3-367557846245616
     - id: rustfs
       name: rustfs
       endpoint: https://s3.cn-guangzhou-a.k8s.openprojectx.org

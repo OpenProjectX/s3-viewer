@@ -8,10 +8,12 @@ import org.openprojectx.s3.viewer.autoconfigure.model.CreateFolderRequest
 import org.openprojectx.s3.viewer.autoconfigure.model.DeleteRequest
 import org.openprojectx.s3.viewer.autoconfigure.model.ObjectEntry
 import org.openprojectx.s3.viewer.autoconfigure.model.ObjectEntryType
+import org.openprojectx.s3.viewer.autoconfigure.model.AvroSchemaPreviewResponse
 import org.openprojectx.s3.viewer.autoconfigure.model.ParquetSchemaPreviewResponse
 import org.openprojectx.s3.viewer.autoconfigure.model.ProviderSummary
 import org.openprojectx.s3.viewer.autoconfigure.model.SearchResponse
 import org.openprojectx.s3.viewer.autoconfigure.model.TextPreviewResponse
+import org.openprojectx.s3.viewer.core.AvroSchemaPreview
 import org.openprojectx.s3.viewer.core.BucketBrowseResult
 import org.openprojectx.s3.viewer.core.BucketObjectEntry
 import org.openprojectx.s3.viewer.core.BucketObjectType
@@ -108,6 +110,18 @@ class ViewerController(
         Mono.fromSupplier {
             ResponseEntity.ok(
                 s3ViewerService.previewParquetSchema(providerId, bucketName, key).toApiModel()
+            )
+        }
+
+    override fun previewAvroSchema(
+        providerId: String,
+        bucketName: String,
+        key: String,
+        exchange: ServerWebExchange
+    ): Mono<ResponseEntity<AvroSchemaPreviewResponse>> =
+        Mono.fromSupplier {
+            ResponseEntity.ok(
+                s3ViewerService.previewAvroSchema(providerId, bucketName, key).toApiModel()
             )
         }
 
@@ -229,6 +243,13 @@ private fun TextObjectPreview.toApiModel(): TextPreviewResponse =
 
 private fun ParquetSchemaPreview.toApiModel(): ParquetSchemaPreviewResponse =
     ParquetSchemaPreviewResponse()
+        .key(key)
+        .fileName(fileName)
+        .size(size)
+        .schema(schema)
+
+private fun AvroSchemaPreview.toApiModel(): AvroSchemaPreviewResponse =
+    AvroSchemaPreviewResponse()
         .key(key)
         .fileName(fileName)
         .size(size)
