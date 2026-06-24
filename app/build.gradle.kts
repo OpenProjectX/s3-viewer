@@ -1,7 +1,7 @@
 plugins {
     id("buildsrc.convention.spring-kotlin")
     id("com.google.cloud.tools.jib") version "3.4.5"
-    id("org.openprojectx.bigdata-test") version "0.1.26-SNAPSHOT"
+    id("org.openprojectx.bigdata-test") version "0.1.26"
 }
 
 bigDataTest {
