@@ -53,6 +53,16 @@ export interface ParquetSchemaPreviewResponse {
   schema: string
 }
 
+export interface ParquetDataPreviewResponse {
+  key: string
+  fileName: string
+  size?: number | null
+  schema: string
+  truncated: boolean
+  recordCount: number
+  content: string
+}
+
 export interface AvroSchemaPreviewResponse {
   key: string
   fileName: string

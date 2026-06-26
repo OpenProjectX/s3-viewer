@@ -18,12 +18,13 @@ import FormatAlignLeftIcon from '@mui/icons-material/FormatAlignLeft'
 import { Highlight, themes } from 'prism-react-renderer'
 import type { Language } from 'prism-react-renderer'
 
-import type { AvroDataPreviewResponse, AvroSchemaPreviewResponse, ParquetSchemaPreviewResponse, TextPreviewResponse } from '../types/api'
+import type { AvroDataPreviewResponse, AvroSchemaPreviewResponse, ParquetDataPreviewResponse, ParquetSchemaPreviewResponse, TextPreviewResponse } from '../types/api'
 import { formatBytes } from '../utils/format'
 
 type PreviewData =
   | { kind: 'text'; value: TextPreviewResponse }
-  | { kind: 'parquet'; value: ParquetSchemaPreviewResponse }
+  | { kind: 'parquet-schema'; value: ParquetSchemaPreviewResponse }
+  | { kind: 'parquet-data'; value: ParquetDataPreviewResponse }
   | { kind: 'avro-schema'; value: AvroSchemaPreviewResponse }
   | { kind: 'avro-data'; value: AvroDataPreviewResponse }
 
@@ -38,17 +39,17 @@ interface PreviewDialogProps {
 }
 
 function previewContent(data: PreviewData): string {
-  if (data.kind === 'text' || data.kind === 'avro-data') {
+  if (data.kind === 'text' || data.kind === 'avro-data' || data.kind === 'parquet-data') {
     return data.value.content
   }
   return data.value.schema
 }
 
 function previewLanguage(data: PreviewData): Language {
-  if (data.kind === 'parquet') {
+  if (data.kind === 'parquet-schema') {
     return 'sql'
   }
-  if (data.kind === 'avro-schema' || data.kind === 'avro-data') {
+  if (data.kind === 'avro-schema' || data.kind === 'avro-data' || data.kind === 'parquet-data') {
     return 'json'
   }
 
@@ -160,7 +161,8 @@ const PreviewDialog: React.FC<PreviewDialogProps> = ({ open, loading, error, dat
           <Typography variant="h6" component="span" noWrap>
             {title}
           </Typography>
-          {data?.kind === 'parquet' && <Chip label="Parquet schema" size="small" />}
+          {data?.kind === 'parquet-schema' && <Chip label="Parquet schema" size="small" />}
+          {data?.kind === 'parquet-data' && <Chip label="Parquet data" size="small" />}
           {data?.kind === 'avro-schema' && <Chip label="Avro schema" size="small" />}
           {data?.kind === 'avro-data' && <Chip label="Avro data" size="small" />}
           {data?.kind === 'text' && <Chip label={data.value.contentType} size="small" />}
@@ -195,6 +197,12 @@ const PreviewDialog: React.FC<PreviewDialogProps> = ({ open, loading, error, dat
                 <Chip label={`${data.value.recordCount} records`} size="small" variant="outlined" />
               )}
               {data.kind === 'avro-data' && data.value.truncated && (
+                <Chip label="Truncated preview" size="small" color="warning" variant="outlined" />
+              )}
+              {data.kind === 'parquet-data' && (
+                <Chip label={`${data.value.recordCount} records`} size="small" variant="outlined" />
+              )}
+              {data.kind === 'parquet-data' && data.value.truncated && (
                 <Chip label="Truncated preview" size="small" color="warning" variant="outlined" />
               )}
               {canFormat && (

@@ -16,6 +16,8 @@ interface S3ViewerService {
 
     fun previewParquetSchema(providerId: String, bucketName: String, key: String): ParquetSchemaPreview
 
+    fun previewParquetData(providerId: String, bucketName: String, key: String, maxRecords: Int): ParquetDataPreview
+
     fun previewAvroSchema(providerId: String, bucketName: String, key: String): AvroSchemaPreview
 
     fun previewAvroData(providerId: String, bucketName: String, key: String, maxRecords: Int): AvroDataPreview
@@ -87,6 +89,16 @@ data class ParquetSchemaPreview(
     val fileName: String,
     val size: Long?,
     val schema: String
+)
+
+data class ParquetDataPreview(
+    val key: String,
+    val fileName: String,
+    val size: Long?,
+    val schema: String,
+    val truncated: Boolean,
+    val recordCount: Int,
+    val content: String
 )
 
 data class AvroSchemaPreview(

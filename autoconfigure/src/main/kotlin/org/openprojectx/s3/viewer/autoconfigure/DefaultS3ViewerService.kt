@@ -6,6 +6,7 @@ import org.openprojectx.s3.viewer.core.BucketObjectType
 import org.openprojectx.s3.viewer.core.AvroDataPreview
 import org.openprojectx.s3.viewer.core.AvroSchemaPreview
 import org.openprojectx.s3.viewer.core.ObjectDownload
+import org.openprojectx.s3.viewer.core.ParquetDataPreview
 import org.openprojectx.s3.viewer.core.ParquetSchemaPreview
 import org.openprojectx.s3.viewer.core.S3ViewerException
 import org.openprojectx.s3.viewer.core.S3ViewerService
@@ -20,6 +21,7 @@ import org.apache.avro.generic.GenericDatumReader
 import org.apache.avro.generic.GenericRecord
 import org.apache.avro.generic.GenericDatumWriter
 import org.apache.avro.io.EncoderFactory
+import org.apache.parquet.avro.AvroParquetReader
 import org.apache.parquet.hadoop.ParquetFileReader
 import org.apache.parquet.io.InputFile
 import org.apache.parquet.io.SeekableInputStream
@@ -263,6 +265,50 @@ internal open class DefaultS3ViewerService(
             )
         } catch (ex: Exception) {
             throw S3ViewerException("Failed to read parquet schema for object '$key'", ex)
+        }
+    }
+
+    override fun previewParquetData(providerId: String, bucketName: String, key: String, maxRecords: Int): ParquetDataPreview {
+        val provider = getProvider(providerId)
+        requireAllowedBucket(provider, bucketName)
+        val path = resolveObjectPath(provider, bucketName, key)
+        val attributes = Files.readAttributes(path, BasicFileAttributes::class.java)
+        val fileName = path.name.ifBlank { key }
+        val contentType = detectContentType(provider, bucketName, key, path, fileName)
+
+        if (!isParquetPreviewSupported(fileName, contentType)) {
+            throw S3ViewerException("Object '$key' is not a supported parquet preview type")
+        }
+
+        val recordLimit = maxRecords.coerceIn(1, MAX_PARQUET_PREVIEW_RECORDS)
+        try {
+            val inputFile = SeekablePathInputFile(path, attributes.size())
+            val parquetSchema = ParquetFileReader.open(inputFile).use { reader ->
+                reader.footer.fileMetaData.schema.toString()
+            }
+            val rows = mutableListOf<String>()
+            var truncated = false
+
+            AvroParquetReader.builder<GenericRecord>(inputFile).build().use { reader ->
+                var record = reader.read()
+                while (record != null && rows.size < recordLimit) {
+                    rows.add(record.schema.recordToJson(record))
+                    record = reader.read()
+                }
+                truncated = record != null
+            }
+
+            return ParquetDataPreview(
+                key = key,
+                fileName = fileName,
+                size = attributes.size(),
+                schema = parquetSchema,
+                truncated = truncated,
+                recordCount = rows.size,
+                content = rows.toJsonArray()
+            )
+        } catch (ex: Exception) {
+            throw S3ViewerException("Failed to read parquet data for object '$key'", ex)
         }
     }
 
@@ -790,6 +836,7 @@ internal open class DefaultS3ViewerService(
 
     companion object {
         private const val MAX_TEXT_PREVIEW_BYTES = 1024 * 1024L
+        private const val MAX_PARQUET_PREVIEW_RECORDS = 1_000
         private const val MAX_AVRO_PREVIEW_RECORDS = 1_000
 
         private val TEXT_PREVIEW_CONTENT_TYPES = setOf(

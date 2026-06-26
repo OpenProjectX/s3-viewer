@@ -7,6 +7,7 @@ import type {
   CreateFolderRequest,
   DeleteRequest,
   ObjectEntry,
+  ParquetDataPreviewResponse,
   ParquetSchemaPreviewResponse,
   ProviderSummary,
   SearchResponse,
@@ -91,6 +92,19 @@ export async function previewParquetSchema(
   const { data } = await client.get<ParquetSchemaPreviewResponse>(
     `/providers/${providerId}/buckets/${bucketName}/preview/parquet/schema`,
     { params: { key } }
+  )
+  return data
+}
+
+export async function previewParquetData(
+  providerId: string,
+  bucketName: string,
+  key: string,
+  maxRecords = 100
+): Promise<ParquetDataPreviewResponse> {
+  const { data } = await client.get<ParquetDataPreviewResponse>(
+    `/providers/${providerId}/buckets/${bucketName}/preview/parquet/data`,
+    { params: { key, maxRecords } }
   )
   return data
 }

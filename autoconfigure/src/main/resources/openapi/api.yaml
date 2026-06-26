@@ -141,6 +141,37 @@ paths:
                 $ref: "#/components/schemas/ParquetSchemaPreviewResponse"
         "404":
           $ref: "#/components/responses/NotFound"
+  /s3-viewer/api/v1/providers/{providerId}/buckets/{bucketName}/preview/parquet/data:
+    get:
+      tags: [Viewer]
+      operationId: previewParquetData
+      summary: Preview Parquet data as JSON records
+      parameters:
+        - $ref: "#/components/parameters/ProviderId"
+        - $ref: "#/components/parameters/BucketName"
+        - name: key
+          in: query
+          required: true
+          description: Parquet object key to preview
+          schema:
+            type: string
+        - name: maxRecords
+          in: query
+          required: false
+          description: Maximum records to read for preview (default 100)
+          schema:
+            type: integer
+            format: int32
+            default: 100
+      responses:
+        "200":
+          description: Parquet data preview returned successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ParquetDataPreviewResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /s3-viewer/api/v1/providers/{providerId}/buckets/{bucketName}/preview/avro/schema:
     get:
       tags: [Viewer]
@@ -456,6 +487,27 @@ components:
           format: int64
           nullable: true
         schema:
+          type: string
+    ParquetDataPreviewResponse:
+      type: object
+      required: [key, fileName, schema, truncated, recordCount, content]
+      properties:
+        key:
+          type: string
+        fileName:
+          type: string
+        size:
+          type: integer
+          format: int64
+          nullable: true
+        schema:
+          type: string
+        truncated:
+          type: boolean
+        recordCount:
+          type: integer
+          format: int32
+        content:
           type: string
     AvroSchemaPreviewResponse:
       type: object

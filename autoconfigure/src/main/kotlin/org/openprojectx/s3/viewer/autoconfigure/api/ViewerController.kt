@@ -10,6 +10,7 @@ import org.openprojectx.s3.viewer.autoconfigure.model.ObjectEntry
 import org.openprojectx.s3.viewer.autoconfigure.model.ObjectEntryType
 import org.openprojectx.s3.viewer.autoconfigure.model.AvroDataPreviewResponse
 import org.openprojectx.s3.viewer.autoconfigure.model.AvroSchemaPreviewResponse
+import org.openprojectx.s3.viewer.autoconfigure.model.ParquetDataPreviewResponse
 import org.openprojectx.s3.viewer.autoconfigure.model.ParquetSchemaPreviewResponse
 import org.openprojectx.s3.viewer.autoconfigure.model.ProviderSummary
 import org.openprojectx.s3.viewer.autoconfigure.model.SearchResponse
@@ -19,6 +20,7 @@ import org.openprojectx.s3.viewer.core.AvroSchemaPreview
 import org.openprojectx.s3.viewer.core.BucketBrowseResult
 import org.openprojectx.s3.viewer.core.BucketObjectEntry
 import org.openprojectx.s3.viewer.core.BucketObjectType
+import org.openprojectx.s3.viewer.core.ParquetDataPreview
 import org.openprojectx.s3.viewer.core.ParquetSchemaPreview
 import org.openprojectx.s3.viewer.core.S3ViewerService
 import org.openprojectx.s3.viewer.core.SearchResult
@@ -112,6 +114,24 @@ class ViewerController(
         Mono.fromSupplier {
             ResponseEntity.ok(
                 s3ViewerService.previewParquetSchema(providerId, bucketName, key).toApiModel()
+            )
+        }
+
+    override fun previewParquetData(
+        providerId: String,
+        bucketName: String,
+        key: String,
+        maxRecords: Int?,
+        exchange: ServerWebExchange
+    ): Mono<ResponseEntity<ParquetDataPreviewResponse>> =
+        Mono.fromSupplier {
+            ResponseEntity.ok(
+                s3ViewerService.previewParquetData(
+                    providerId = providerId,
+                    bucketName = bucketName,
+                    key = key,
+                    maxRecords = maxRecords ?: 100
+                ).toApiModel()
             )
         }
 
@@ -267,6 +287,16 @@ private fun ParquetSchemaPreview.toApiModel(): ParquetSchemaPreviewResponse =
         .fileName(fileName)
         .size(size)
         .schema(schema)
+
+private fun ParquetDataPreview.toApiModel(): ParquetDataPreviewResponse =
+    ParquetDataPreviewResponse()
+        .key(key)
+        .fileName(fileName)
+        .size(size)
+        .schema(schema)
+        .truncated(truncated)
+        .recordCount(recordCount)
+        .content(content)
 
 private fun AvroSchemaPreview.toApiModel(): AvroSchemaPreviewResponse =
     AvroSchemaPreviewResponse()

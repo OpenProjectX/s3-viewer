@@ -5,8 +5,11 @@ plugins {
 }
 
 bigDataTest {
+//    enabled = false
     config.add("classpath:spring-bigdata-test.toml")
     extensionConfig.add("classpath:spring-bigdata-extensions.toml")
+    autoConfigureTestTasks = false
+    autoConfigureJavaExecTasks = false
 }
 
 
@@ -26,6 +29,7 @@ dependencies {
     testImplementation("software.amazon.awssdk:s3")
     testImplementation("software.amazon.awssdk:auth")
     testImplementation("org.apache.avro:avro:1.12.1")
+    testImplementation("org.apache.parquet:parquet-avro:1.17.1")
 
     testImplementation("com.microsoft.playwright:playwright:${libs.versions.playwright.get()}")
 

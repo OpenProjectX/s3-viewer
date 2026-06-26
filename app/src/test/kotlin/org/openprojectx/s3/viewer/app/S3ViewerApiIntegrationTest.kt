@@ -4,6 +4,10 @@ import org.apache.avro.Schema
 import org.apache.avro.file.DataFileWriter
 import org.apache.avro.generic.GenericData
 import org.apache.avro.generic.GenericDatumWriter
+import org.apache.parquet.avro.AvroParquetWriter
+import org.apache.parquet.hadoop.metadata.CompressionCodecName
+import org.apache.parquet.io.OutputFile
+import org.apache.parquet.io.PositionOutputStream
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.BeforeAll
@@ -82,7 +86,7 @@ class S3ViewerApiIntegrationTest : S3ViewerLocalStackIntegrationTest() {
             )
             s3.putObject(
                 PutObjectRequest.builder().bucket("test-bucket").key("warehouse/hive-parquet/data.parquet").build(),
-                RequestBody.fromBytes(ByteArray(32))
+                RequestBody.fromBytes(parquetBytes())
             )
             s3.putObject(
                 PutObjectRequest.builder().bucket("test-bucket").key("schemas/user-event.avsc").build(),
@@ -187,6 +191,27 @@ class S3ViewerApiIntegrationTest : S3ViewerLocalStackIntegrationTest() {
             .jsonPath("$.contentType").isEqualTo("application/octet-stream")
             .jsonPath("$.truncated").isEqualTo(false)
             .jsonPath("$.content").isEqualTo("Plain text extension")
+
+        webTestClient.get()
+            .uri("/s3-viewer/api/v1/providers/test/buckets/test-bucket/preview/parquet/schema?key=warehouse/hive-parquet/data.parquet")
+            .exchange()
+            .expectStatus().isOk
+            .expectBody()
+            .jsonPath("$.fileName").isEqualTo("data.parquet")
+            .jsonPath("$.schema").value<String> { assertEquals(true, it.contains("UserEvent")) }
+            .jsonPath("$.schema").value<String> { assertEquals(true, it.contains("enabled")) }
+
+        webTestClient.get()
+            .uri("/s3-viewer/api/v1/providers/test/buckets/test-bucket/preview/parquet/data?key=warehouse/hive-parquet/data.parquet&maxRecords=1")
+            .exchange()
+            .expectStatus().isOk
+            .expectBody()
+            .jsonPath("$.fileName").isEqualTo("data.parquet")
+            .jsonPath("$.recordCount").isEqualTo(1)
+            .jsonPath("$.truncated").isEqualTo(true)
+            .jsonPath("$.schema").value<String> { assertEquals(true, it.contains("UserEvent")) }
+            .jsonPath("$.content").value<String> { assertEquals(true, it.contains("evt-1")) }
+            .jsonPath("$.content").value<String> { assertEquals(true, it.contains("enabled")) }
 
         webTestClient.get()
             .uri("/s3-viewer/api/v1/providers/test/buckets/test-bucket/preview/avro/schema?key=schemas/user-event.avsc")
@@ -308,6 +333,27 @@ class S3ViewerApiIntegrationTest : S3ViewerLocalStackIntegrationTest() {
         return output.toByteArray()
     }
 
+    private fun parquetBytes(): ByteArray {
+        val output = ByteArrayOutputFile()
+        AvroParquetWriter.builder<GenericData.Record>(output)
+            .withSchema(userSchema)
+            .withCompressionCodec(CompressionCodecName.UNCOMPRESSED)
+            .build()
+            .use { writer ->
+                val record = GenericData.Record(userSchema).apply {
+                    put("id", "evt-1")
+                    put("enabled", true)
+                }
+                writer.write(record)
+                val secondRecord = GenericData.Record(userSchema).apply {
+                    put("id", "evt-2")
+                    put("enabled", false)
+                }
+                writer.write(secondRecord)
+            }
+        return output.toByteArray()
+    }
+
     private fun S3Client.createBucketIfMissing(bucketName: String) {
         try {
             createBucket(CreateBucketRequest.builder().bucket(bucketName).build())
@@ -317,4 +363,31 @@ class S3ViewerApiIntegrationTest : S3ViewerLocalStackIntegrationTest() {
             }
         }
     }
+}
+
+private class ByteArrayOutputFile : OutputFile {
+    private val output = ByteArrayOutputStream()
+
+    override fun create(blockSizeHint: Long): PositionOutputStream = outputStream()
+
+    override fun createOrOverwrite(blockSizeHint: Long): PositionOutputStream = outputStream()
+
+    override fun supportsBlockSize(): Boolean = false
+
+    override fun defaultBlockSize(): Long = 0L
+
+    fun toByteArray(): ByteArray = output.toByteArray()
+
+    private fun outputStream(): PositionOutputStream =
+        object : PositionOutputStream() {
+            override fun getPos(): Long = output.size().toLong()
+
+            override fun write(value: Int) {
+                output.write(value)
+            }
+
+            override fun write(bytes: ByteArray, offset: Int, length: Int) {
+                output.write(bytes, offset, length)
+            }
+        }
 }
