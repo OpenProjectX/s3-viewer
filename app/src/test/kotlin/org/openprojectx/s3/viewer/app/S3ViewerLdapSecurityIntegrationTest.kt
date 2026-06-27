@@ -103,6 +103,7 @@ class S3ViewerLdapSecurityIntegrationTest : S3ViewerLocalStackIntegrationTest() 
         private const val LDIF_DIRECTORY = "/var/lib/apacheds/default/ldif"
         private const val BUNDLED_LOG4J_CONFIG = "/opt/apacheds/conf/log4j.properties"
         private const val APACHEDS_ROLLING_LOG = "/var/lib/apacheds/default/log/apacheds-rolling.log"
+        private val testLogger = LoggerFactory.getLogger(S3ViewerLdapSecurityIntegrationTest::class.java)
         private val apachedsLogger = LoggerFactory.getLogger("org.openprojectx.s3.viewer.test.apacheds")
 
         @Container
@@ -164,7 +165,9 @@ class S3ViewerLdapSecurityIntegrationTest : S3ViewerLocalStackIntegrationTest() 
 
             while (System.nanoTime() < deadline) {
                 try {
-                    if (ldapUserExists(username)) {
+                    val userSummary = findLdapUser(username)
+                    if (userSummary != null) {
+                        testLogger.info("LDAP test user '{}' is available: {}", username, userSummary)
                         return
                     }
                 } catch (exception: Exception) {
@@ -178,7 +181,7 @@ class S3ViewerLdapSecurityIntegrationTest : S3ViewerLocalStackIntegrationTest() 
                 ?: "no LDAP exception captured"
             throw IllegalStateException(
                 "LDAP test user '$username' was not ready after ${timeout.seconds}s; " +
-                    "last failure: $lastFailureMessage; ${ldapDiagnostics()}",
+                    "last failure: $lastFailureMessage; ${ldapDiagnostics()}\n${ldapContentDiagnostics()}",
                 lastFailure
             )
         }
@@ -218,7 +221,48 @@ class S3ViewerLdapSecurityIntegrationTest : S3ViewerLocalStackIntegrationTest() 
         private fun isCi(): Boolean =
             System.getenv("CI").equals("true", ignoreCase = true)
 
-        private fun ldapUserExists(username: String): Boolean {
+        private fun ldapContentDiagnostics(): String =
+            runCatching {
+                withLdapContext { context ->
+                    val controls = SearchControls().apply {
+                        searchScope = SearchControls.SUBTREE_SCOPE
+                        returningAttributes = arrayOf("uid", "sAMAccountName", "cn", "memberOf")
+                        countLimit = 50
+                    }
+                    val results = context.search("ou=Users", "(objectClass=*)", controls)
+                    val users = mutableListOf<String>()
+                    try {
+                        while (results.hasMore()) {
+                            users += formatSearchResult(results.next())
+                        }
+                    } finally {
+                        results.close()
+                    }
+                    "LDAP content diagnostics:\nou=Users entries (${users.size}):\n${users.joinToString("\n")}"
+                }
+            }.getOrElse {
+                "LDAP content diagnostics failed: ${it::class.qualifiedName}: ${it.message}"
+            }
+
+        private fun findLdapUser(username: String): String? =
+            withLdapContext { context ->
+                val controls = SearchControls().apply {
+                    searchScope = SearchControls.SUBTREE_SCOPE
+                    returningAttributes = arrayOf("uid", "sAMAccountName", "cn", "memberOf")
+                }
+                val results = context.search("ou=Users", "(uid=$username)", controls)
+                try {
+                    if (results.hasMore()) {
+                        formatSearchResult(results.next())
+                    } else {
+                        null
+                    }
+                } finally {
+                    results.close()
+                }
+            }
+
+        private fun <T> withLdapContext(block: (InitialDirContext) -> T): T {
             val environment = Hashtable<String, String>().apply {
                 put(Context.INITIAL_CONTEXT_FACTORY, "com.sun.jndi.ldap.LdapCtxFactory")
                 put(Context.PROVIDER_URL, "ldap://${apacheds.host}:${apacheds.getMappedPort(LDAP_PORT)}/dc=example,dc=com")
@@ -229,19 +273,30 @@ class S3ViewerLdapSecurityIntegrationTest : S3ViewerLocalStackIntegrationTest() 
 
             val context = InitialDirContext(environment)
             try {
-                val controls = SearchControls().apply {
-                    searchScope = SearchControls.SUBTREE_SCOPE
-                    returningAttributes = arrayOf("uid")
-                }
-                val results = context.search("ou=Users", "(uid=$username)", controls)
-                try {
-                    return results.hasMore()
-                } finally {
-                    results.close()
-                }
+                return block(context)
             } finally {
                 context.close()
             }
+        }
+
+        private fun formatSearchResult(result: javax.naming.directory.SearchResult): String {
+            val attributes = result.attributes
+            val attributeSummary = sequenceOf("uid", "sAMAccountName", "cn", "memberOf")
+                .mapNotNull { name ->
+                    val attribute = attributes.get(name) ?: return@mapNotNull null
+                    val values = mutableListOf<String>()
+                    val all = attribute.all
+                    try {
+                        while (all.hasMore()) {
+                            values += all.next().toString()
+                        }
+                    } finally {
+                        all.close()
+                    }
+                    "$name=${values.joinToString("|")}"
+                }
+                .joinToString(", ")
+            return "${result.nameInNamespace} [$attributeSummary]"
         }
     }
 }
