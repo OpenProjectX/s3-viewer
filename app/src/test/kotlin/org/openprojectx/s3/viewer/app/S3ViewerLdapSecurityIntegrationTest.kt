@@ -204,7 +204,6 @@ class S3ViewerLdapSecurityIntegrationTest : S3ViewerLocalStackIntegrationTest() 
             try {
                 val controls = SearchControls().apply {
                     searchScope = SearchControls.SUBTREE_SCOPE
-                    countLimit = 1
                     returningAttributes = arrayOf("sAMAccountName")
                 }
                 val results = context.search("ou=Users", "(sAMAccountName=$username)", controls)

@@ -5,11 +5,14 @@ plugins {
 }
 
 bigDataTest {
-//    enabled = false
     config.add("classpath:spring-bigdata-test.toml")
     extensionConfig.add("classpath:spring-bigdata-extensions.toml")
     autoConfigureTestTasks = false
     autoConfigureJavaExecTasks = false
+}
+
+tasks.matching { it.name == "bigDataTest" || it.name.startsWith("bigDataTest") }.configureEach {
+    enabled = false
 }
 
 
