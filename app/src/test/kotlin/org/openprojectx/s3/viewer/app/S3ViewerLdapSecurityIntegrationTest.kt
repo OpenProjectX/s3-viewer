@@ -133,7 +133,7 @@ class S3ViewerLdapSecurityIntegrationTest : S3ViewerLocalStackIntegrationTest() 
             registry.add("spring.ldap.username") { "uid=admin,ou=system" }
             registry.add("spring.ldap.password") { "secret" }
             registry.add("s3-viewer.security.ldap.user-search-base") { "ou=Users" }
-            registry.add("s3-viewer.security.ldap.user-search-filter") { "(sAMAccountName={0})" }
+            registry.add("s3-viewer.security.ldap.user-search-filter") { "(uid={0})" }
             registry.add("s3-viewer.security.ldap.role-mappings.S3_VIEWER_ADMIN[0]") {
                 "cn=Engineering,ou=Groups,dc=example,dc=com"
             }
@@ -204,9 +204,9 @@ class S3ViewerLdapSecurityIntegrationTest : S3ViewerLocalStackIntegrationTest() 
             try {
                 val controls = SearchControls().apply {
                     searchScope = SearchControls.SUBTREE_SCOPE
-                    returningAttributes = arrayOf("sAMAccountName")
+                    returningAttributes = arrayOf("uid")
                 }
-                val results = context.search("ou=Users", "(sAMAccountName=$username)", controls)
+                val results = context.search("ou=Users", "(uid=$username)", controls)
                 try {
                     return results.hasMore()
                 } finally {
