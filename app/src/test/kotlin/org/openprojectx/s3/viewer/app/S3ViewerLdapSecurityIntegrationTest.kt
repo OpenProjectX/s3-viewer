@@ -20,6 +20,10 @@ import software.amazon.awssdk.services.s3.model.PutObjectRequest
 import software.amazon.awssdk.services.s3.model.S3Exception
 import java.time.Duration
 import java.util.Base64
+import java.util.Hashtable
+import javax.naming.Context
+import javax.naming.directory.InitialDirContext
+import javax.naming.directory.SearchControls
 
 class S3ViewerLdapSecurityIntegrationTest : S3ViewerLocalStackIntegrationTest() {
     @LocalServerPort
@@ -32,6 +36,8 @@ class S3ViewerLdapSecurityIntegrationTest : S3ViewerLocalStackIntegrationTest() 
 
     @BeforeAll
     fun seedData() {
+        waitForLdapUser("bbrown")
+        waitForLdapUser("aadams")
         s3Client().use { s3 ->
             s3.createBucketIfMissing("test-bucket")
             s3.putObject(
@@ -130,6 +136,51 @@ class S3ViewerLdapSecurityIntegrationTest : S3ViewerLocalStackIntegrationTest() 
         private fun startApacheDsIfNecessary() {
             if (!apacheds.isRunning) {
                 apacheds.start()
+            }
+        }
+
+        private fun waitForLdapUser(username: String) {
+            val deadline = System.nanoTime() + Duration.ofSeconds(30).toNanos()
+            var lastFailure: Exception? = null
+
+            while (System.nanoTime() < deadline) {
+                try {
+                    if (ldapUserExists(username)) {
+                        return
+                    }
+                } catch (exception: Exception) {
+                    lastFailure = exception
+                }
+                Thread.sleep(250)
+            }
+
+            throw IllegalStateException("LDAP test user '$username' was not ready", lastFailure)
+        }
+
+        private fun ldapUserExists(username: String): Boolean {
+            val environment = Hashtable<String, String>().apply {
+                put(Context.INITIAL_CONTEXT_FACTORY, "com.sun.jndi.ldap.LdapCtxFactory")
+                put(Context.PROVIDER_URL, "ldap://${apacheds.host}:${apacheds.getMappedPort(LDAP_PORT)}/dc=example,dc=com")
+                put(Context.SECURITY_AUTHENTICATION, "simple")
+                put(Context.SECURITY_PRINCIPAL, "uid=admin,ou=system")
+                put(Context.SECURITY_CREDENTIALS, "secret")
+            }
+
+            val context = InitialDirContext(environment)
+            try {
+                val controls = SearchControls().apply {
+                    searchScope = SearchControls.SUBTREE_SCOPE
+                    countLimit = 1
+                    returningAttributes = arrayOf("sAMAccountName")
+                }
+                val results = context.search("ou=Users", "(sAMAccountName=$username)", controls)
+                try {
+                    return results.hasMore()
+                } finally {
+                    results.close()
+                }
+            } finally {
+                context.close()
             }
         }
     }
