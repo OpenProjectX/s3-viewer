@@ -158,7 +158,7 @@ class S3ViewerLdapSecurityIntegrationTest : S3ViewerLocalStackIntegrationTest() 
         }
 
         private fun waitForLdapUser(username: String) {
-            val timeout = Duration.ofMinutes(2)
+            val timeout = Duration.ofSeconds(8)
             val deadline = System.nanoTime() + timeout.toNanos()
             var lastFailure: Exception? = null
 
