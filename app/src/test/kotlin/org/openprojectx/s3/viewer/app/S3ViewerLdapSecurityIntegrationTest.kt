@@ -99,12 +99,18 @@ class S3ViewerLdapSecurityIntegrationTest : S3ViewerLocalStackIntegrationTest() 
     companion object {
         private const val LDAP_PORT = 10389
         private const val LDIF_DIRECTORY = "/var/lib/apacheds/default/ldif"
+        private const val BUNDLED_LOG4J_CONFIG = "/opt/apacheds/conf/log4j.properties"
+        private const val APACHEDS_ROLLING_LOG = "/var/lib/apacheds/default/log/apacheds-rolling.log"
 
         @Container
         @JvmField
         val apacheds: GenericContainer<*> =
             GenericContainer(DockerImageName.parse("ghcr.io/openprojectx/directory-server/apacheds:latest"))
                 .withExposedPorts(LDAP_PORT)
+                .withCopyFileToContainer(
+                    MountableFile.forClasspathResource("ldap/apacheds-log4j.properties"),
+                    BUNDLED_LOG4J_CONFIG
+                )
                 .withCopyFileToContainer(
                     MountableFile.forClasspathResource("ldap/00-ad-compat-schema.ldif"),
                     "$LDIF_DIRECTORY/00-ad-compat-schema.ldif"
@@ -135,12 +141,17 @@ class S3ViewerLdapSecurityIntegrationTest : S3ViewerLocalStackIntegrationTest() 
 
         private fun startApacheDsIfNecessary() {
             if (!apacheds.isRunning) {
-                apacheds.start()
+                try {
+                    apacheds.start()
+                } catch (exception: Exception) {
+                    throw IllegalStateException("ApacheDS test container failed to start; ${ldapDiagnostics()}", exception)
+                }
             }
         }
 
         private fun waitForLdapUser(username: String) {
-            val deadline = System.nanoTime() + Duration.ofSeconds(30).toNanos()
+            val timeout = Duration.ofMinutes(2)
+            val deadline = System.nanoTime() + timeout.toNanos()
             var lastFailure: Exception? = null
 
             while (System.nanoTime() < deadline) {
@@ -154,7 +165,30 @@ class S3ViewerLdapSecurityIntegrationTest : S3ViewerLocalStackIntegrationTest() 
                 Thread.sleep(250)
             }
 
-            throw IllegalStateException("LDAP test user '$username' was not ready", lastFailure)
+            val lastFailureMessage = lastFailure
+                ?.let { "${it::class.qualifiedName}: ${it.message}" }
+                ?: "no LDAP exception captured"
+            throw IllegalStateException(
+                "LDAP test user '$username' was not ready after ${timeout.seconds}s; " +
+                    "last failure: $lastFailureMessage; ${ldapDiagnostics()}",
+                lastFailure
+            )
+        }
+
+        private fun ldapDiagnostics(): String {
+            val ldifDirectory = runCatching {
+                apacheds.execInContainer("sh", "-c", "ls -l $LDIF_DIRECTORY").stdout.trim()
+            }.getOrElse { "failed to list LDIF directory: ${it.message}" }
+            val logTail = runCatching {
+                apacheds.logs.takeLast(4000).replace("\n", "\\n")
+            }.getOrElse { "failed to read container logs: ${it.message}" }
+            val rollingLogTail = runCatching {
+                apacheds.execInContainer("sh", "-c", "tail -n 200 $APACHEDS_ROLLING_LOG").stdout.trim()
+                    .replace("\n", "\\n")
+            }.getOrElse { "failed to read ApacheDS rolling log: ${it.message}" }
+
+            return "containerRunning=${apacheds.isRunning}, ldifDirectory=[$ldifDirectory], " +
+                "logTail=[$logTail], rollingLogTail=[$rollingLogTail]"
         }
 
         private fun ldapUserExists(username: String): Boolean {
