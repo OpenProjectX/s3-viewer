@@ -79,6 +79,55 @@ For LocalStack (dev profile), see `app/src/main/resources/application-dev.yaml`.
 
 Set `s3-viewer.read-only-access=true` to reject all write operations. Upload and delete requests return `403`, and the bundled UI hides upload, delete, and multi-select controls.
 
+### Basic LDAP security and RBAC
+
+Security is disabled by default. Enable HTTP Basic authentication backed by LDAP with:
+
+```yaml
+s3-viewer:
+  security:
+    enabled: true
+    ldap:
+      url: ldap://ad.example.com:389
+      base-dn: DC=example,DC=com
+      manager-dn: CN=s3-viewer-bind,OU=Service Accounts,DC=example,DC=com
+      manager-password: ${LDAP_MANAGER_PASSWORD}
+      user-search-base: OU=Users
+      user-search-filter: "(&(objectClass=user)(sAMAccountName={0}))"
+      member-of-attribute: memberOf
+```
+
+By default, roles are derived from Microsoft Active Directory `memberOf` values. For a group DN like `CN=S3 Viewer Admins,OU=Groups,DC=example,DC=com`, the user gets authority `ROLE_S3_VIEWER_ADMINS`.
+
+RBAC is configurable under `s3-viewer.security.rbac.rules`. Rules are evaluated before the default authenticated rule for `/s3-viewer/**`. Role names may be written with or without `ROLE_`.
+
+```yaml
+s3-viewer:
+  security:
+    rbac:
+      enabled: true
+      rules:
+        - path: /s3-viewer/api/v1/providers/{providerId}/buckets/{bucketName}/objects
+          methods: [DELETE]
+          roles: [S3_VIEWER_ADMIN]
+        - path: /s3-viewer/api/v1/providers/{providerId}/buckets/{bucketName}/upload
+          methods: [POST]
+          roles: [S3_VIEWER_ADMIN]
+```
+
+The built-in RBAC defaults require `ROLE_S3_VIEWER_ADMIN` or `ROLE_ADMIN` for upload, folder creation, and delete. Other S3 Viewer routes require any authenticated LDAP user.
+
+Use `role-mappings` when the AD group CN should not be the application role name:
+
+```yaml
+s3-viewer:
+  security:
+    ldap:
+      role-mappings:
+        S3_VIEWER_ADMIN:
+          - CN=Data Platform Admins,OU=Groups,DC=example,DC=com
+```
+
 Provider configuration can also be supplied entirely through environment variables. Spring Boot maps indexed list properties like `s3-viewer.providers[0].id` to env vars using uppercase names and underscores:
 
 ```bash

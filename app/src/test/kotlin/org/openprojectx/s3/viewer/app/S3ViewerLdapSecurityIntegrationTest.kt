@@ -1,0 +1,136 @@
+package org.openprojectx.s3.viewer.app
+
+import org.junit.jupiter.api.BeforeAll
+import org.junit.jupiter.api.Test
+import org.springframework.boot.test.web.server.LocalServerPort
+import org.springframework.http.HttpMethod
+import org.springframework.http.MediaType
+import org.springframework.test.context.DynamicPropertyRegistry
+import org.springframework.test.context.DynamicPropertySource
+import org.springframework.test.web.reactive.server.WebTestClient
+import org.testcontainers.containers.GenericContainer
+import org.testcontainers.containers.wait.strategy.Wait
+import org.testcontainers.junit.jupiter.Container
+import org.testcontainers.utility.DockerImageName
+import org.testcontainers.utility.MountableFile
+import software.amazon.awssdk.core.sync.RequestBody
+import software.amazon.awssdk.services.s3.S3Client
+import software.amazon.awssdk.services.s3.model.CreateBucketRequest
+import software.amazon.awssdk.services.s3.model.PutObjectRequest
+import software.amazon.awssdk.services.s3.model.S3Exception
+import java.time.Duration
+import java.util.Base64
+
+class S3ViewerLdapSecurityIntegrationTest : S3ViewerLocalStackIntegrationTest() {
+    @LocalServerPort
+    private var port: Int = 0
+
+    private val webTestClient: WebTestClient
+        get() = WebTestClient.bindToServer()
+            .baseUrl("http://localhost:$port")
+            .build()
+
+    @BeforeAll
+    fun seedData() {
+        s3Client().use { s3 ->
+            s3.createBucketIfMissing("test-bucket")
+            s3.putObject(
+                PutObjectRequest.builder().bucket("test-bucket").key("docs/readme.txt").build(),
+                RequestBody.fromString("secured content")
+            )
+            s3.putObject(
+                PutObjectRequest.builder().bucket("test-bucket").key("docs/delete-me.txt").build(),
+                RequestBody.fromString("delete me")
+            )
+        }
+    }
+
+    @Test
+    fun `basic ldap authentication and memberOf rbac protect api routes`() {
+        webTestClient.get()
+            .uri("/s3-viewer/api/v1/providers")
+            .exchange()
+            .expectStatus().isUnauthorized
+
+        webTestClient.get()
+            .uri("/s3-viewer/api/v1/providers")
+            .basicAuth("bbrown", "secret")
+            .exchange()
+            .expectStatus().isOk
+
+        webTestClient.method(HttpMethod.DELETE)
+            .uri("/s3-viewer/api/v1/providers/test/buckets/test-bucket/objects")
+            .basicAuth("bbrown", "secret")
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue("""{"keys":["docs/delete-me.txt"]}""")
+            .exchange()
+            .expectStatus().isForbidden
+
+        webTestClient.method(HttpMethod.DELETE)
+            .uri("/s3-viewer/api/v1/providers/test/buckets/test-bucket/objects")
+            .basicAuth("aadams", "secret")
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue("""{"keys":["docs/delete-me.txt"]}""")
+            .exchange()
+            .expectStatus().isNoContent
+    }
+
+    private fun <S : WebTestClient.RequestHeadersSpec<S>> S.basicAuth(username: String, password: String): S {
+        val credentials = Base64.getEncoder().encodeToString("$username:$password".toByteArray())
+        return header("Authorization", "Basic $credentials")
+    }
+
+    private fun S3Client.createBucketIfMissing(bucketName: String) {
+        try {
+            createBucket(CreateBucketRequest.builder().bucket(bucketName).build())
+        } catch (exception: S3Exception) {
+            if (exception.statusCode() != 409) {
+                throw exception
+            }
+        }
+    }
+
+    companion object {
+        private const val LDAP_PORT = 10389
+        private const val LDIF_DIRECTORY = "/var/lib/apacheds/default/ldif"
+
+        @Container
+        @JvmField
+        val apacheds: GenericContainer<*> =
+            GenericContainer(DockerImageName.parse("ghcr.io/openprojectx/directory-server/apacheds:latest"))
+                .withExposedPorts(LDAP_PORT)
+                .withCopyFileToContainer(
+                    MountableFile.forClasspathResource("ldap/00-ad-compat-schema.ldif"),
+                    "$LDIF_DIRECTORY/00-ad-compat-schema.ldif"
+                )
+                .withCopyFileToContainer(
+                    MountableFile.forClasspathResource("ldap/10-example-directory.ldif"),
+                    "$LDIF_DIRECTORY/10-example-directory.ldif"
+                )
+                .waitingFor(Wait.forListeningPort().withStartupTimeout(Duration.ofMinutes(2)))
+
+        @JvmStatic
+        @DynamicPropertySource
+        fun configureSecurityProperties(registry: DynamicPropertyRegistry) {
+            registry.add("s3-viewer.security.enabled") { true }
+            registry.add("s3-viewer.security.ldap.url") {
+                startApacheDsIfNecessary()
+                "ldap://${apacheds.host}:${apacheds.getMappedPort(LDAP_PORT)}"
+            }
+            registry.add("s3-viewer.security.ldap.base-dn") { "dc=example,dc=com" }
+            registry.add("s3-viewer.security.ldap.manager-dn") { "uid=admin,ou=system" }
+            registry.add("s3-viewer.security.ldap.manager-password") { "secret" }
+            registry.add("s3-viewer.security.ldap.user-search-base") { "ou=Users" }
+            registry.add("s3-viewer.security.ldap.user-search-filter") { "(sAMAccountName={0})" }
+            registry.add("s3-viewer.security.ldap.role-mappings.S3_VIEWER_ADMIN[0]") {
+                "cn=Engineering,ou=Groups,dc=example,dc=com"
+            }
+        }
+
+        private fun startApacheDsIfNecessary() {
+            if (!apacheds.isRunning) {
+                apacheds.start()
+            }
+        }
+    }
+}

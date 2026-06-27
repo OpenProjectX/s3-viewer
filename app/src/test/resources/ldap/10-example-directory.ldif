@@ -1,0 +1,95 @@
+version: 1
+dn: ou=Users,dc=example,dc=com
+objectClass: organizationalUnit
+objectClass: top
+ou: Users
+
+dn: ou=Groups,dc=example,dc=com
+objectClass: organizationalUnit
+objectClass: top
+ou: Groups
+
+dn: ou=Computers,dc=example,dc=com
+objectClass: organizationalUnit
+objectClass: top
+ou: Computers
+
+dn: cn=Alice Adams,ou=Users,dc=example,dc=com
+objectClass: activeDirectoryObject
+objectClass: inetOrgPerson
+objectClass: organizationalPerson
+objectClass: person
+objectClass: top
+cn: Alice Adams
+sn: Adams
+givenName: Alice
+displayName: Alice Adams
+mail: alice.adams@example.com
+uid: aadams
+sAMAccountName: aadams
+userPrincipalName: alice.adams@example.com
+userPassword: secret
+objectSid: S-1-5-21-1000000000-1000000001-1000000002-1101
+objectGUID: 11111111-1111-4111-8111-111111111111
+userAccountControl: 512
+primaryGroupID: 513
+memberOf: cn=Engineering,ou=Groups,dc=example,dc=com
+memberOf: cn=All Staff,ou=Groups,dc=example,dc=com
+
+dn: cn=Bob Brown,ou=Users,dc=example,dc=com
+objectClass: activeDirectoryObject
+objectClass: inetOrgPerson
+objectClass: organizationalPerson
+objectClass: person
+objectClass: top
+cn: Bob Brown
+sn: Brown
+givenName: Bob
+displayName: Bob Brown
+mail: bob.brown@example.com
+uid: bbrown
+sAMAccountName: bbrown
+userPrincipalName: bob.brown@example.com
+userPassword: secret
+objectSid: S-1-5-21-1000000000-1000000001-1000000002-1102
+objectGUID: 22222222-2222-4222-8222-222222222222
+userAccountControl: 514
+primaryGroupID: 513
+memberOf: cn=All Staff,ou=Groups,dc=example,dc=com
+
+dn: cn=Engineering,ou=Groups,dc=example,dc=com
+objectClass: activeDirectoryObject
+objectClass: groupOfNames
+objectClass: top
+cn: Engineering
+description: Engineering users
+sAMAccountName: Engineering
+objectSid: S-1-5-21-1000000000-1000000001-1000000002-2101
+objectGUID: 33333333-3333-4333-8333-333333333333
+groupType: -2147483646
+member: cn=Alice Adams,ou=Users,dc=example,dc=com
+
+dn: cn=All Staff,ou=Groups,dc=example,dc=com
+objectClass: activeDirectoryObject
+objectClass: groupOfNames
+objectClass: top
+cn: All Staff
+description: All employee users
+sAMAccountName: All Staff
+objectSid: S-1-5-21-1000000000-1000000001-1000000002-2102
+objectGUID: 44444444-4444-4444-8444-444444444444
+groupType: -2147483646
+member: cn=Alice Adams,ou=Users,dc=example,dc=com
+member: cn=Bob Brown,ou=Users,dc=example,dc=com
+member: cn=Engineering,ou=Groups,dc=example,dc=com
+
+dn: cn=APP01,ou=Computers,dc=example,dc=com
+objectClass: activeDirectoryObject
+objectClass: device
+objectClass: top
+cn: APP01
+description: Example application server computer object
+sAMAccountName: APP01$
+objectSid: S-1-5-21-1000000000-1000000001-1000000002-3101
+objectGUID: 55555555-5555-4555-8555-555555555555
+userAccountControl: 4096

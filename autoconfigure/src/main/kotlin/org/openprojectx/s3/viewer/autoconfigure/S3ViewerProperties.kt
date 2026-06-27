@@ -11,7 +11,8 @@ data class S3ViewerProperties(
     @field:Valid
     val providers: List<Provider> = emptyList(),
     val readOnlyAccess: Boolean = false,
-    val ui: UiProperties = UiProperties()
+    val ui: UiProperties = UiProperties(),
+    val security: SecurityProperties = SecurityProperties()
 ) {
     data class UiProperties(
         /**
@@ -41,5 +42,55 @@ data class S3ViewerProperties(
         val buckets: List<String> = emptyList()
     ) {
         fun allowsAllBuckets(): Boolean = allBuckets || buckets.isEmpty()
+    }
+
+    data class SecurityProperties(
+        val enabled: Boolean = false,
+        val ldap: LdapProperties = LdapProperties(),
+        val rbac: RbacProperties = RbacProperties()
+    )
+
+    data class LdapProperties(
+        val url: String = "",
+        val baseDn: String = "",
+        val managerDn: String? = null,
+        val managerPassword: String? = null,
+        val userSearchBase: String = "",
+        val userSearchFilter: String = "(&(objectClass=user)(sAMAccountName={0}))",
+        val memberOfAttribute: String = "memberOf",
+        val rolePrefix: String = "ROLE_",
+        val roleMappings: Map<String, List<String>> = emptyMap()
+    )
+
+    data class RbacProperties(
+        val enabled: Boolean = true,
+        val rules: List<AccessRule> = defaultAccessRules()
+    )
+
+    data class AccessRule(
+        val path: String,
+        val methods: List<String> = emptyList(),
+        val roles: List<String> = emptyList()
+    )
+
+    companion object {
+        private fun defaultAccessRules(): List<AccessRule> =
+            listOf(
+                AccessRule(
+                    "/s3-viewer/api/v1/providers/{providerId}/buckets/{bucketName}/upload",
+                    listOf("POST"),
+                    listOf("S3_VIEWER_ADMIN", "ADMIN")
+                ),
+                AccessRule(
+                    "/s3-viewer/api/v1/providers/{providerId}/buckets/{bucketName}/folders",
+                    listOf("POST"),
+                    listOf("S3_VIEWER_ADMIN", "ADMIN")
+                ),
+                AccessRule(
+                    "/s3-viewer/api/v1/providers/{providerId}/buckets/{bucketName}/objects",
+                    listOf("DELETE"),
+                    listOf("S3_VIEWER_ADMIN", "ADMIN")
+                )
+            )
     }
 }

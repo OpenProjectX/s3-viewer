@@ -61,6 +61,7 @@ dependencies {
     api("org.springframework.boot:spring-boot-starter")
     implementation("org.springframework:spring-aop")
     implementation("org.aspectj:aspectjweaver")
+    implementation("org.springframework.boot:spring-boot-starter-security")
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-webflux")
     implementation("org.springdoc:springdoc-openapi-starter-webflux-ui:3.0.2")
