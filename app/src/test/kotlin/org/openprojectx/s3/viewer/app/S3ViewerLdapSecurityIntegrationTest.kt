@@ -2,6 +2,7 @@ package org.openprojectx.s3.viewer.app
 
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
+import org.slf4j.LoggerFactory
 import org.springframework.boot.test.web.server.LocalServerPort
 import org.springframework.http.HttpMethod
 import org.springframework.http.MediaType
@@ -9,6 +10,7 @@ import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.web.reactive.server.WebTestClient
 import org.testcontainers.containers.GenericContainer
+import org.testcontainers.containers.output.Slf4jLogConsumer
 import org.testcontainers.containers.wait.strategy.Wait
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.utility.DockerImageName
@@ -101,6 +103,7 @@ class S3ViewerLdapSecurityIntegrationTest : S3ViewerLocalStackIntegrationTest() 
         private const val LDIF_DIRECTORY = "/var/lib/apacheds/default/ldif"
         private const val BUNDLED_LOG4J_CONFIG = "/opt/apacheds/conf/log4j.properties"
         private const val APACHEDS_ROLLING_LOG = "/var/lib/apacheds/default/log/apacheds-rolling.log"
+        private val apachedsLogger = LoggerFactory.getLogger("org.openprojectx.s3.viewer.test.apacheds")
 
         @Container
         @JvmField
@@ -120,6 +123,11 @@ class S3ViewerLdapSecurityIntegrationTest : S3ViewerLocalStackIntegrationTest() 
                     "$LDIF_DIRECTORY/10-example-directory.ldif"
                 )
                 .waitingFor(Wait.forListeningPort().withStartupTimeout(Duration.ofMinutes(2)))
+                .apply {
+                    if (isCi()) {
+                        withLogConsumer(Slf4jLogConsumer(apachedsLogger))
+                    }
+                }
 
         @JvmStatic
         @DynamicPropertySource
@@ -180,16 +188,35 @@ class S3ViewerLdapSecurityIntegrationTest : S3ViewerLocalStackIntegrationTest() 
                 apacheds.execInContainer("sh", "-c", "ls -l $LDIF_DIRECTORY").stdout.trim()
             }.getOrElse { "failed to list LDIF directory: ${it.message}" }
             val logTail = runCatching {
-                apacheds.logs.takeLast(4000).replace("\n", "\\n")
+                apacheds.logs.takeLast(diagnosticLogChars())
             }.getOrElse { "failed to read container logs: ${it.message}" }
             val rollingLogTail = runCatching {
-                apacheds.execInContainer("sh", "-c", "tail -n 200 $APACHEDS_ROLLING_LOG").stdout.trim()
-                    .replace("\n", "\\n")
+                apacheds.execInContainer("sh", "-c", "tail -n ${diagnosticLogLines()} $APACHEDS_ROLLING_LOG")
+                    .stdout
+                    .trim()
             }.getOrElse { "failed to read ApacheDS rolling log: ${it.message}" }
 
-            return "containerRunning=${apacheds.isRunning}, ldifDirectory=[$ldifDirectory], " +
-                "logTail=[$logTail], rollingLogTail=[$rollingLogTail]"
+            return """
+                ApacheDS diagnostics:
+                containerRunning=${apacheds.isRunning}
+                containerId=${apacheds.containerId}
+                ldifDirectory:
+                $ldifDirectory
+                dockerLogTail:
+                $logTail
+                rollingLogTail:
+                $rollingLogTail
+            """.trimIndent()
         }
+
+        private fun diagnosticLogChars(): Int =
+            if (isCi()) 20_000 else 4_000
+
+        private fun diagnosticLogLines(): Int =
+            if (isCi()) 1_000 else 200
+
+        private fun isCi(): Boolean =
+            System.getenv("CI").equals("true", ignoreCase = true)
 
         private fun ldapUserExists(username: String): Boolean {
             val environment = Hashtable<String, String>().apply {

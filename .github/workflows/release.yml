@@ -101,6 +101,11 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
+      - name: Print test container image digests
+        if: env.SKIP_TESTS != 'true'
+        run: |
+          docker buildx imagetools inspect ghcr.io/openprojectx/directory-server/apacheds:latest
+
       - name: Verify build
         if: env.SKIP_TESTS != 'true'
         run: |
@@ -139,6 +144,12 @@ jobs:
             skip_test_args=(-x test)
           fi
           ./gradlew --no-configuration-cache release --stacktrace "--$GRADLE_LOG_LEVEL" "${skip_test_args[@]}" $EXTRA_GRADLE_ARGS
+
+      - name: Print Docker diagnostics
+        if: failure()
+        run: |
+          docker ps -a
+          docker images --digests ghcr.io/openprojectx/directory-server/apacheds || true
 
       - name: Upload diagnostics
         if: failure()
