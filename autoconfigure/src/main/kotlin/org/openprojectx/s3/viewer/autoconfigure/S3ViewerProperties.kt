@@ -51,10 +51,6 @@ data class S3ViewerProperties(
     )
 
     data class LdapProperties(
-        val url: String = "",
-        val baseDn: String = "",
-        val managerDn: String? = null,
-        val managerPassword: String? = null,
         val userSearchBase: String = "",
         val userSearchFilter: String = "(&(objectClass=user)(sAMAccountName={0}))",
         val memberOfAttribute: String = "memberOf",

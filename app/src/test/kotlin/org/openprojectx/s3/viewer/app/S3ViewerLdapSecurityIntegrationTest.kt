@@ -113,13 +113,13 @@ class S3ViewerLdapSecurityIntegrationTest : S3ViewerLocalStackIntegrationTest() 
         @DynamicPropertySource
         fun configureSecurityProperties(registry: DynamicPropertyRegistry) {
             registry.add("s3-viewer.security.enabled") { true }
-            registry.add("s3-viewer.security.ldap.url") {
+            registry.add("spring.ldap.urls") {
                 startApacheDsIfNecessary()
                 "ldap://${apacheds.host}:${apacheds.getMappedPort(LDAP_PORT)}"
             }
-            registry.add("s3-viewer.security.ldap.base-dn") { "dc=example,dc=com" }
-            registry.add("s3-viewer.security.ldap.manager-dn") { "uid=admin,ou=system" }
-            registry.add("s3-viewer.security.ldap.manager-password") { "secret" }
+            registry.add("spring.ldap.base") { "dc=example,dc=com" }
+            registry.add("spring.ldap.username") { "uid=admin,ou=system" }
+            registry.add("spring.ldap.password") { "secret" }
             registry.add("s3-viewer.security.ldap.user-search-base") { "ou=Users" }
             registry.add("s3-viewer.security.ldap.user-search-filter") { "(sAMAccountName={0})" }
             registry.add("s3-viewer.security.ldap.role-mappings.S3_VIEWER_ADMIN[0]") {

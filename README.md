@@ -84,18 +84,44 @@ Set `s3-viewer.read-only-access=true` to reject all write operations. Upload and
 Security is disabled by default. Enable HTTP Basic authentication backed by LDAP with:
 
 ```yaml
+spring:
+  ldap:
+    urls: ldap://ad.example.com:389
+    base: DC=example,DC=com
+    username: CN=s3-viewer-bind,OU=Service Accounts,DC=example,DC=com
+    password: ${LDAP_MANAGER_PASSWORD}
+
 s3-viewer:
   security:
     enabled: true
     ldap:
-      url: ldap://ad.example.com:389
-      base-dn: DC=example,DC=com
-      manager-dn: CN=s3-viewer-bind,OU=Service Accounts,DC=example,DC=com
-      manager-password: ${LDAP_MANAGER_PASSWORD}
       user-search-base: OU=Users
       user-search-filter: "(&(objectClass=user)(sAMAccountName={0}))"
       member-of-attribute: memberOf
 ```
+
+LDAP connection, base DN, and bind credentials use Spring Boot's standard `spring.ldap.*` configuration. S3 Viewer only configures authentication search behavior and application role mapping.
+
+Use these Spring Boot LDAP properties for directory connectivity:
+
+| Property | Purpose |
+| --- | --- |
+| `spring.ldap.urls` | LDAP server URL or URLs, for example `ldap://ad.example.com:389` |
+| `spring.ldap.base` | Directory base DN used by LDAP searches |
+| `spring.ldap.username` | Bind DN for authenticated LDAP searches |
+| `spring.ldap.password` | Bind password |
+
+Use these S3 Viewer LDAP properties for authentication and role extraction:
+
+| Property | Default | Purpose |
+| --- | --- | --- |
+| `s3-viewer.security.ldap.user-search-base` | empty | Search base relative to `spring.ldap.base` |
+| `s3-viewer.security.ldap.user-search-filter` | `(&(objectClass=user)(sAMAccountName={0}))` | LDAP user search filter; `{0}` is the Basic auth username |
+| `s3-viewer.security.ldap.member-of-attribute` | `memberOf` | Attribute used to derive roles from Microsoft Active Directory groups |
+| `s3-viewer.security.ldap.role-prefix` | `ROLE_` | Prefix applied to generated Spring Security authorities |
+| `s3-viewer.security.ldap.role-mappings` | empty | Explicit mapping from application roles to AD group CNs or DNs |
+
+The old S3 Viewer connection properties `s3-viewer.security.ldap.url`, `base-dn`, `manager-dn`, and `manager-password` are no longer used; configure those values with `spring.ldap.*`.
 
 By default, roles are derived from Microsoft Active Directory `memberOf` values. For a group DN like `CN=S3 Viewer Admins,OU=Groups,DC=example,DC=com`, the user gets authority `ROLE_S3_VIEWER_ADMINS`.
 
@@ -126,6 +152,19 @@ s3-viewer:
       role-mappings:
         S3_VIEWER_ADMIN:
           - CN=Data Platform Admins,OU=Groups,DC=example,DC=com
+```
+
+The same configuration can be supplied with environment variables:
+
+```bash
+export SPRING_LDAP_URLS=ldap://ad.example.com:389
+export SPRING_LDAP_BASE='DC=example,DC=com'
+export SPRING_LDAP_USERNAME='CN=s3-viewer-bind,OU=Service Accounts,DC=example,DC=com'
+export SPRING_LDAP_PASSWORD="$LDAP_MANAGER_PASSWORD"
+export S3_VIEWER_SECURITY_ENABLED=true
+export S3_VIEWER_SECURITY_LDAP_USER_SEARCH_BASE='OU=Users'
+export S3_VIEWER_SECURITY_LDAP_USER_SEARCH_FILTER='(&(objectClass=user)(sAMAccountName={0}))'
+export S3_VIEWER_SECURITY_LDAP_ROLE_MAPPINGS_S3_VIEWER_ADMIN_0='CN=Data Platform Admins,OU=Groups,DC=example,DC=com'
 ```
 
 Provider configuration can also be supplied entirely through environment variables. Spring Boot maps indexed list properties like `s3-viewer.providers[0].id` to env vars using uppercase names and underscores:
