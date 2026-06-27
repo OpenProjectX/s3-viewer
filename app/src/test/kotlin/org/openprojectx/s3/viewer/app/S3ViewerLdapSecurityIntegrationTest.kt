@@ -170,7 +170,7 @@ class S3ViewerLdapSecurityIntegrationTest : S3ViewerLocalStackIntegrationTest() 
                 } catch (exception: Exception) {
                     lastFailure = exception
                 }
-                Thread.sleep(250)
+                Thread.sleep(1000)
             }
 
             val lastFailureMessage = lastFailure
