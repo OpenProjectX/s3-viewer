@@ -39,6 +39,7 @@ import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.server.ServerWebExchange
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
+import reactor.core.scheduler.Schedulers
 import java.time.ZoneOffset
 
 @RestController
@@ -47,7 +48,7 @@ class ViewerController(
 ) : ViewerApi {
 
     override fun listProviders(exchange: ServerWebExchange): Mono<ResponseEntity<Flux<ProviderSummary>>> =
-        Mono.fromSupplier {
+        blocking {
             ResponseEntity.ok(Flux.fromIterable(s3ViewerService.listProviders().map(ViewerProvider::toApiModel)))
         }
 
@@ -55,7 +56,7 @@ class ViewerController(
         providerId: String,
         exchange: ServerWebExchange
     ): Mono<ResponseEntity<Flux<BucketSummary>>> =
-        Mono.fromSupplier {
+        blocking {
             ResponseEntity.ok(Flux.fromIterable(s3ViewerService.listBuckets(providerId).map(ViewerBucket::toApiModel)))
         }
 
@@ -65,7 +66,7 @@ class ViewerController(
         path: String?,
         exchange: ServerWebExchange
     ): Mono<ResponseEntity<BrowseResponse>> =
-        Mono.fromSupplier {
+        blocking {
             ResponseEntity.ok(s3ViewerService.browseBucket(providerId, bucketName, path).toApiModel())
         }
 
@@ -75,14 +76,14 @@ class ViewerController(
         key: String,
         exchange: ServerWebExchange
     ): Mono<ResponseEntity<org.springframework.core.io.Resource>> =
-        Mono.fromSupplier {
+        blocking {
             val download = s3ViewerService.downloadObject(providerId, bucketName, key)
             val headers = HttpHeaders().apply {
                 contentType = MediaType.parseMediaType(download.contentType)
                 contentDisposition = ContentDisposition.attachment().filename(download.fileName).build()
                 download.size?.let { contentLength = it }
             }
-        ResponseEntity.ok()
+            ResponseEntity.ok()
                 .headers(headers)
                 .body(InputStreamResource(download.inputStream))
         }
@@ -94,7 +95,7 @@ class ViewerController(
         maxBytes: Long?,
         exchange: ServerWebExchange
     ): Mono<ResponseEntity<TextPreviewResponse>> =
-        Mono.fromSupplier {
+        blocking {
             ResponseEntity.ok(
                 s3ViewerService.previewTextObject(
                     providerId = providerId,
@@ -111,7 +112,7 @@ class ViewerController(
         key: String,
         exchange: ServerWebExchange
     ): Mono<ResponseEntity<ParquetSchemaPreviewResponse>> =
-        Mono.fromSupplier {
+        blocking {
             ResponseEntity.ok(
                 s3ViewerService.previewParquetSchema(providerId, bucketName, key).toApiModel()
             )
@@ -124,7 +125,7 @@ class ViewerController(
         maxRecords: Int?,
         exchange: ServerWebExchange
     ): Mono<ResponseEntity<ParquetDataPreviewResponse>> =
-        Mono.fromSupplier {
+        blocking {
             ResponseEntity.ok(
                 s3ViewerService.previewParquetData(
                     providerId = providerId,
@@ -141,7 +142,7 @@ class ViewerController(
         key: String,
         exchange: ServerWebExchange
     ): Mono<ResponseEntity<AvroSchemaPreviewResponse>> =
-        Mono.fromSupplier {
+        blocking {
             ResponseEntity.ok(
                 s3ViewerService.previewAvroSchema(providerId, bucketName, key).toApiModel()
             )
@@ -154,7 +155,7 @@ class ViewerController(
         maxRecords: Int?,
         exchange: ServerWebExchange
     ): Mono<ResponseEntity<AvroDataPreviewResponse>> =
-        Mono.fromSupplier {
+        blocking {
             ResponseEntity.ok(
                 s3ViewerService.previewAvroData(
                     providerId = providerId,
@@ -171,14 +172,16 @@ class ViewerController(
         createFolderRequest: Mono<CreateFolderRequest>,
         exchange: ServerWebExchange
     ): Mono<ResponseEntity<ObjectEntry>> =
-        createFolderRequest.map { request ->
-            val entry = s3ViewerService.createFolder(
-                providerId = providerId,
-                bucketName = bucketName,
-                path = request.path,
-                folderName = request.folderName
-            )
-            ResponseEntity.status(HttpStatus.CREATED).body(entry.toApiModel())
+        createFolderRequest.flatMap { request ->
+            blocking {
+                val entry = s3ViewerService.createFolder(
+                    providerId = providerId,
+                    bucketName = bucketName,
+                    path = request.path,
+                    folderName = request.folderName
+                )
+                ResponseEntity.status(HttpStatus.CREATED).body(entry.toApiModel())
+            }
         }
 
     override fun uploadObject(
@@ -198,11 +201,13 @@ class ViewerController(
                 baos.write(bytes)
                 baos
             }
-        ).map { baos ->
-            val entry = s3ViewerService.uploadObject(
-                providerId, bucketName, path, fileName, baos.toByteArray().inputStream()
-            )
-            ResponseEntity.status(HttpStatus.CREATED).body(entry.toApiModel())
+        ).flatMap { baos ->
+            blocking {
+                val entry = s3ViewerService.uploadObject(
+                    providerId, bucketName, path, fileName, baos.toByteArray().inputStream()
+                )
+                ResponseEntity.status(HttpStatus.CREATED).body(entry.toApiModel())
+            }
         }
     }
 
@@ -212,9 +217,11 @@ class ViewerController(
         deleteRequest: Mono<DeleteRequest>,
         exchange: ServerWebExchange
     ): Mono<ResponseEntity<Void>> =
-        deleteRequest.map { request ->
-            s3ViewerService.deleteObjects(providerId, bucketName, request.keys)
-            ResponseEntity.noContent().build()
+        deleteRequest.flatMap { request ->
+            blocking {
+                s3ViewerService.deleteObjects(providerId, bucketName, request.keys)
+                ResponseEntity.noContent().build()
+            }
         }
 
     override fun searchObjects(
@@ -225,13 +232,16 @@ class ViewerController(
         maxResults: Int?,
         exchange: ServerWebExchange
     ): Mono<ResponseEntity<SearchResponse>> =
-        Mono.fromSupplier {
+        blocking {
             val result = s3ViewerService.searchObjects(
                 providerId, bucketName, query, path, maxResults ?: 100
             )
             ResponseEntity.ok(result.toApiModel())
         }
 }
+
+private fun <T : Any> blocking(supplier: () -> T): Mono<T> =
+    Mono.fromCallable(supplier).subscribeOn(Schedulers.boundedElastic())
 
 private fun ViewerProvider.toApiModel(): ProviderSummary =
     ProviderSummary()

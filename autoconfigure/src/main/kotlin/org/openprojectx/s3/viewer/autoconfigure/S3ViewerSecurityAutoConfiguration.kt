@@ -105,17 +105,17 @@ private class LdapReactiveAuthenticationManager(
     }
 
     private fun ldapAuthenticationProvider(): LdapAuthenticationProvider {
-        val userSearch = FilterBasedLdapUserSearch(
-            properties.userSearchBase.trim().trim(','),
-            properties.userSearchFilter,
-            contextSource
-        ).apply {
-            setSearchSubtree(true)
-            setReturningAttributes(arrayOf(properties.memberOfAttribute, "distinguishedName"))
-        }
-
         val authenticator = BindAuthenticator(contextSource).apply {
-            setUserSearch(userSearch)
+            setUserAttributes(arrayOf(properties.memberOfAttribute, "distinguishedName"))
+            when (properties.authenticationMode) {
+                S3ViewerProperties.LdapAuthenticationMode.SEARCH -> setUserSearch(ldapUserSearch())
+                S3ViewerProperties.LdapAuthenticationMode.DIRECT_BIND -> {
+                    require(properties.userDnPatterns.isNotEmpty()) {
+                        "s3-viewer.security.ldap.user-dn-patterns must be configured when direct LDAP bind is enabled"
+                    }
+                    setUserDnPatterns(properties.userDnPatterns.toTypedArray())
+                }
+            }
             afterPropertiesSet()
         }
 
@@ -123,6 +123,16 @@ private class LdapReactiveAuthenticationManager(
             setHideUserNotFoundExceptions(true)
         }
     }
+
+    private fun ldapUserSearch(): FilterBasedLdapUserSearch =
+        FilterBasedLdapUserSearch(
+            properties.userSearchBase.trim().trim(','),
+            properties.userSearchFilter,
+            contextSource
+        ).apply {
+            setSearchSubtree(true)
+            setReturningAttributes(arrayOf(properties.memberOfAttribute, "distinguishedName"))
+        }
 }
 
 private class MemberOfAuthoritiesPopulator(

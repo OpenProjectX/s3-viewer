@@ -51,12 +51,19 @@ data class S3ViewerProperties(
     )
 
     data class LdapProperties(
+        val authenticationMode: LdapAuthenticationMode = LdapAuthenticationMode.SEARCH,
         val userSearchBase: String = "",
         val userSearchFilter: String = "(&(objectClass=user)(sAMAccountName={0}))",
+        val userDnPatterns: List<String> = emptyList(),
         val memberOfAttribute: String = "memberOf",
         val rolePrefix: String = "ROLE_",
         val roleMappings: Map<String, List<String>> = emptyMap()
     )
+
+    enum class LdapAuthenticationMode {
+        SEARCH,
+        DIRECT_BIND
+    }
 
     data class RbacProperties(
         val enabled: Boolean = true,

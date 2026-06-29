@@ -62,13 +62,13 @@ class S3ViewerLdapSecurityIntegrationTest : S3ViewerLocalStackIntegrationTest() 
 
         webTestClient.get()
             .uri("/s3-viewer/api/v1/providers")
-            .basicAuth("bbrown", "secret")
+            .basicAuth("Bob Brown", "secret")
             .exchange()
             .expectStatus().isOk
 
         webTestClient.method(HttpMethod.DELETE)
             .uri("/s3-viewer/api/v1/providers/test/buckets/test-bucket/objects")
-            .basicAuth("bbrown", "secret")
+            .basicAuth("Bob Brown", "secret")
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue("""{"keys":["docs/delete-me.txt"]}""")
             .exchange()
@@ -76,7 +76,7 @@ class S3ViewerLdapSecurityIntegrationTest : S3ViewerLocalStackIntegrationTest() 
 
         webTestClient.method(HttpMethod.DELETE)
             .uri("/s3-viewer/api/v1/providers/test/buckets/test-bucket/objects")
-            .basicAuth("aadams", "secret")
+            .basicAuth("Alice Adams", "secret")
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue("""{"keys":["docs/delete-me.txt"]}""")
             .exchange()
@@ -139,10 +139,8 @@ class S3ViewerLdapSecurityIntegrationTest : S3ViewerLocalStackIntegrationTest() 
                 "ldap://${apacheds.host}:${apacheds.getMappedPort(LDAP_PORT)}"
             }
             registry.add("spring.ldap.base") { "dc=example,dc=com" }
-            registry.add("spring.ldap.username") { "uid=admin,ou=system" }
-            registry.add("spring.ldap.password") { "secret" }
-            registry.add("s3-viewer.security.ldap.user-search-base") { "ou=Users" }
-            registry.add("s3-viewer.security.ldap.user-search-filter") { "(uid={0})" }
+            registry.add("s3-viewer.security.ldap.authentication-mode") { "direct-bind" }
+            registry.add("s3-viewer.security.ldap.user-dn-patterns[0]") { "cn={0},ou=Users" }
             registry.add("s3-viewer.security.ldap.role-mappings.S3_VIEWER_ADMIN[0]") {
                 "cn=Engineering,ou=Groups,dc=example,dc=com"
             }

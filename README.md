@@ -95,33 +95,56 @@ s3-viewer:
   security:
     enabled: true
     ldap:
+      authentication-mode: search
       user-search-base: OU=Users
       user-search-filter: "(&(objectClass=user)(sAMAccountName={0}))"
       member-of-attribute: memberOf
 ```
 
-LDAP connection, base DN, and bind credentials use Spring Boot's standard `spring.ldap.*` configuration. S3 Viewer only configures authentication search behavior and application role mapping.
+LDAP connection, base DN, and optional bind credentials use Spring Boot's standard `spring.ldap.*` configuration. S3 Viewer configures authentication behavior and application role mapping.
 
 Use these Spring Boot LDAP properties for directory connectivity:
 
 | Property | Purpose |
 | --- | --- |
 | `spring.ldap.urls` | LDAP server URL or URLs, for example `ldap://ad.example.com:389` |
-| `spring.ldap.base` | Directory base DN used by LDAP searches |
-| `spring.ldap.username` | Bind DN for authenticated LDAP searches |
-| `spring.ldap.password` | Bind password |
+| `spring.ldap.base` | Directory base DN used by LDAP searches and relative direct-bind DN patterns |
+| `spring.ldap.username` | Bind DN for authenticated LDAP searches; not required for direct-bind mode |
+| `spring.ldap.password` | Bind password; not required for direct-bind mode |
 
 Use these S3 Viewer LDAP properties for authentication and role extraction:
 
 | Property | Default | Purpose |
 | --- | --- | --- |
+| `s3-viewer.security.ldap.authentication-mode` | `search` | LDAP authentication mode. Use `search` for manager-bind search then user bind, or `direct-bind` to bind directly with user DN patterns |
 | `s3-viewer.security.ldap.user-search-base` | empty | Search base relative to `spring.ldap.base` |
 | `s3-viewer.security.ldap.user-search-filter` | `(&(objectClass=user)(sAMAccountName={0}))` | LDAP user search filter; `{0}` is the Basic auth username |
+| `s3-viewer.security.ldap.user-dn-patterns` | empty | DN patterns used by `direct-bind`; `{0}` is the Basic auth username. Patterns may be relative to `spring.ldap.base` |
 | `s3-viewer.security.ldap.member-of-attribute` | `memberOf` | Attribute used to derive roles from Microsoft Active Directory groups |
 | `s3-viewer.security.ldap.role-prefix` | `ROLE_` | Prefix applied to generated Spring Security authorities |
 | `s3-viewer.security.ldap.role-mappings` | empty | Explicit mapping from application roles to AD group CNs or DNs |
 
 The old S3 Viewer connection properties `s3-viewer.security.ldap.url`, `base-dn`, `manager-dn`, and `manager-password` are no longer used; configure those values with `spring.ldap.*`.
+
+Use direct-bind mode when the client username can be formatted into the user's LDAP DN and you do not want to configure a manager bind DN:
+
+```yaml
+spring:
+  ldap:
+    urls: ldap://ad.example.com:389
+    base: DC=example,DC=com
+
+s3-viewer:
+  security:
+    enabled: true
+    ldap:
+      authentication-mode: direct-bind
+      user-dn-patterns:
+        - "CN={0},OU=Users"
+      member-of-attribute: memberOf
+```
+
+With this mode the application binds as the supplied user DN and password directly. `memberOf` RBAC still requires the directory to return the configured membership attribute for the bound user.
 
 By default, roles are derived from Microsoft Active Directory `memberOf` values. For a group DN like `CN=S3 Viewer Admins,OU=Groups,DC=example,DC=com`, the user gets authority `ROLE_S3_VIEWER_ADMINS`.
 
@@ -162,6 +185,7 @@ export SPRING_LDAP_BASE='DC=example,DC=com'
 export SPRING_LDAP_USERNAME='CN=s3-viewer-bind,OU=Service Accounts,DC=example,DC=com'
 export SPRING_LDAP_PASSWORD="$LDAP_MANAGER_PASSWORD"
 export S3_VIEWER_SECURITY_ENABLED=true
+export S3_VIEWER_SECURITY_LDAP_AUTHENTICATION_MODE=search
 export S3_VIEWER_SECURITY_LDAP_USER_SEARCH_BASE='OU=Users'
 export S3_VIEWER_SECURITY_LDAP_USER_SEARCH_FILTER='(&(objectClass=user)(sAMAccountName={0}))'
 export S3_VIEWER_SECURITY_LDAP_ROLE_MAPPINGS_S3_VIEWER_ADMIN_0='CN=Data Platform Admins,OU=Groups,DC=example,DC=com'
