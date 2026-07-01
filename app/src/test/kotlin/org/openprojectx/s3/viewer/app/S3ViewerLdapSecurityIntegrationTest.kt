@@ -91,6 +91,15 @@ class S3ViewerLdapSecurityIntegrationTest : S3ViewerLocalStackIntegrationTest() 
             .bodyValue("""{"keys":["docs/delete-me.txt"]}""")
             .exchange()
             .expectStatus().isNoContent
+
+        stopApacheDs()
+
+        webTestClient.get()
+            .uri("/s3-viewer/api/v1/providers")
+            .cookie(sessionCookie.name, sessionCookie.value)
+            .basicAuth("Bob Brown", "secret")
+            .exchange()
+            .expectStatus().isOk
     }
 
     private fun <S : WebTestClient.RequestHeadersSpec<S>> S.basicAuth(username: String, password: String): S {
@@ -163,6 +172,12 @@ class S3ViewerLdapSecurityIntegrationTest : S3ViewerLocalStackIntegrationTest() 
                 } catch (exception: Exception) {
                     throw IllegalStateException("ApacheDS test container failed to start; ${ldapDiagnostics()}", exception)
                 }
+            }
+        }
+
+        private fun stopApacheDs() {
+            if (apacheds.isRunning) {
+                apacheds.stop()
             }
         }
 

@@ -10,7 +10,7 @@ import org.springframework.http.HttpMethod
 import org.springframework.security.authentication.BadCredentialsException
 import org.springframework.security.authentication.ReactiveAuthenticationManager
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
-import org.springframework.security.config.Customizer
+import org.springframework.security.config.web.server.SecurityWebFiltersOrder
 import org.springframework.security.config.web.server.ServerHttpSecurity
 import org.springframework.security.core.Authentication
 import org.springframework.security.core.GrantedAuthority
@@ -20,7 +20,12 @@ import org.springframework.security.ldap.authentication.LdapAuthenticationProvid
 import org.springframework.security.ldap.search.FilterBasedLdapUserSearch
 import org.springframework.security.ldap.userdetails.LdapAuthoritiesPopulator
 import org.springframework.security.web.server.SecurityWebFilterChain
+import org.springframework.security.web.server.authentication.AuthenticationWebFilter
+import org.springframework.security.web.server.authentication.HttpBasicServerAuthenticationEntryPoint
+import org.springframework.security.web.server.authentication.ServerHttpBasicAuthenticationConverter
 import org.springframework.security.web.server.context.WebSessionServerSecurityContextRepository
+import org.springframework.security.web.server.util.matcher.ServerWebExchangeMatcher
+import org.springframework.security.web.server.util.matcher.ServerWebExchangeMatcher.MatchResult
 import org.springframework.ldap.core.DirContextOperations
 import org.springframework.ldap.core.support.BaseLdapPathContextSource
 import reactor.core.publisher.Mono
@@ -54,14 +59,22 @@ class S3ViewerSecurityAutoConfiguration {
         http: ServerHttpSecurity,
         authenticationManager: ReactiveAuthenticationManager,
         properties: S3ViewerProperties
-    ): SecurityWebFilterChain =
-        http
+    ): SecurityWebFilterChain {
+        val securityContextRepository = WebSessionServerSecurityContextRepository()
+        val basicAuthenticationFilter = sessionAwareBasicAuthenticationFilter(
+            authenticationManager,
+            securityContextRepository
+        )
+
+        return http
             .csrf { it.disable() }
-            .securityContextRepository(WebSessionServerSecurityContextRepository())
+            .securityContextRepository(securityContextRepository)
             .formLogin { it.disable() }
             .logout { it.disable() }
-            .httpBasic(Customizer.withDefaults())
+            .httpBasic { it.disable() }
+            .exceptionHandling { it.authenticationEntryPoint(HttpBasicServerAuthenticationEntryPoint()) }
             .authenticationManager(authenticationManager)
+            .addFilterAt(basicAuthenticationFilter, SecurityWebFiltersOrder.HTTP_BASIC)
             .authorizeExchange { exchanges ->
                 exchanges.pathMatchers("/actuator/health", "/actuator/health/**").permitAll()
                 if (properties.security.rbac.enabled) {
@@ -83,7 +96,23 @@ class S3ViewerSecurityAutoConfiguration {
                 exchanges.anyExchange().denyAll()
             }
             .build()
+    }
 }
+
+private fun sessionAwareBasicAuthenticationFilter(
+    authenticationManager: ReactiveAuthenticationManager,
+    securityContextRepository: WebSessionServerSecurityContextRepository
+): AuthenticationWebFilter =
+    AuthenticationWebFilter(authenticationManager).apply {
+        setServerAuthenticationConverter(ServerHttpBasicAuthenticationConverter())
+        setSecurityContextRepository(securityContextRepository)
+        setRequiresAuthenticationMatcher { exchange ->
+            securityContextRepository.load(exchange)
+                .filter { context -> context.authentication?.isAuthenticated == true }
+                .flatMap<MatchResult> { MatchResult.notMatch() }
+                .switchIfEmpty(MatchResult.match())
+        }
+    }
 
 private class LdapReactiveAuthenticationManager(
     private val contextSource: BaseLdapPathContextSource,
