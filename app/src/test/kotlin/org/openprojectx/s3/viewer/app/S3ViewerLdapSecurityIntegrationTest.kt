@@ -60,9 +60,19 @@ class S3ViewerLdapSecurityIntegrationTest : S3ViewerLocalStackIntegrationTest() 
             .exchange()
             .expectStatus().isUnauthorized
 
-        webTestClient.get()
+        val authenticatedResult = webTestClient.get()
             .uri("/s3-viewer/api/v1/providers")
             .basicAuth("Bob Brown", "secret")
+            .exchange()
+            .expectStatus().isOk
+            .returnResult(String::class.java)
+
+        val sessionCookie = authenticatedResult.responseCookies["SESSION"]?.firstOrNull()
+            ?: error("Expected successful LDAP Basic authentication to create a SESSION cookie")
+
+        webTestClient.get()
+            .uri("/s3-viewer/api/v1/providers")
+            .cookie(sessionCookie.name, sessionCookie.value)
             .exchange()
             .expectStatus().isOk
 

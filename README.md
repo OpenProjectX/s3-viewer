@@ -103,6 +103,8 @@ s3-viewer:
 
 LDAP connection, base DN, and optional bind credentials use Spring Boot's standard `spring.ldap.*` configuration. S3 Viewer configures authentication behavior and application role mapping.
 
+After a successful LDAP Basic authentication, S3 Viewer stores the Spring Security context in the WebFlux web session. Clients can reuse the returned `SESSION` cookie for later API calls instead of sending the Basic authorization header on every request.
+
 Use these Spring Boot LDAP properties for directory connectivity:
 
 | Property | Purpose |

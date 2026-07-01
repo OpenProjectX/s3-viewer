@@ -20,6 +20,7 @@ import org.springframework.security.ldap.authentication.LdapAuthenticationProvid
 import org.springframework.security.ldap.search.FilterBasedLdapUserSearch
 import org.springframework.security.ldap.userdetails.LdapAuthoritiesPopulator
 import org.springframework.security.web.server.SecurityWebFilterChain
+import org.springframework.security.web.server.context.WebSessionServerSecurityContextRepository
 import org.springframework.ldap.core.DirContextOperations
 import org.springframework.ldap.core.support.BaseLdapPathContextSource
 import reactor.core.publisher.Mono
@@ -56,6 +57,7 @@ class S3ViewerSecurityAutoConfiguration {
     ): SecurityWebFilterChain =
         http
             .csrf { it.disable() }
+            .securityContextRepository(WebSessionServerSecurityContextRepository())
             .formLogin { it.disable() }
             .logout { it.disable() }
             .httpBasic(Customizer.withDefaults())
